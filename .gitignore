@@ -1,0 +1,47 @@
+# R package development
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# R build artifacts
+*.tar.gz
+*.Rcheck/
+..Rcheck/
+/check/
+
+# Compiled code
+*.o
+*.so
+*.dll
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Package development
+inst/doc
+vignettes/*.html
+vignettes/*.pdf
+
+# Data directories (sensitive)
+data-private/
+cache/
+
+# Temporary files
+*~
+*.swp
+*.swo
+/doc/
+/Meta/
+*.tar.gz

@@ -1,0 +1,41 @@
+Package: mobspain
+Title: Spatial Mobility Analysis for Spanish Transportation Data
+Version: 1.0.0
+Authors@R: 
+    person("Prince", "Oppong Boakye", email = "prynx44@gmail.com", role = c("aut", "cre"))
+Author: Prince Oppong Boakye [aut, cre]
+Maintainer: Prince Oppong Boakye <prynx44@gmail.com>
+Description: A comprehensive toolkit for spatial analysis of Spanish mobility patterns 
+    using MITMA (Ministry of Transport, Mobility and Urban Agenda) data. Provides 
+    streamlined functions for data access, spatial analysis, and automatic map 
+    generation with clear step-by-step messaging and memory-efficient processing. 
+    All analysis functions automatically create spatial maps when geometries are 
+    provided using sf package integration. Features include mobility data retrieval 
+    with advanced filtering capabilities (by region, province, or specific zones), 
+    spatial containment analysis, anomaly detection, machine learning prediction, 
+    and interactive spatial visualizations. Filtering options allow users to 
+    download only the data they need, reducing memory usage and improving performance.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Imports:
+    spanishoddata,
+    sf,
+    dplyr,
+    ggplot2,
+    glue,
+    lubridate,
+    rlang,
+    stats,
+    methods,
+    scales,
+    digest
+Suggests: 
+    testthat (>= 3.0.0),
+    rmarkdown,
+    randomForest,
+    duckdb
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Depends: 
+    R (>= 3.5)
