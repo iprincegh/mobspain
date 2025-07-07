@@ -1,5 +1,5 @@
-# Simple mobspain Example for Spatial Analysis Users
-# This script demonstrates the key spatial analysis features with filtering
+# Comprehensive mobspain Example for Spatial Data Analysis
+# This script demonstrates key mobility analysis features with spatial filtering
 
 # Install and load the package
 # devtools::install_github("iprincegh/mobspain-r-package")
@@ -9,7 +9,7 @@ library(mobspain)
 # Quick Start: Complete Spatial Analysis in One Function
 # =============================================================================
 
-# This function does everything for you - perfect for beginners
+# This function does everything for you - perfect for analysts and researchers
 cat("=== QUICK SPATIAL ANALYSIS ===\n")
 
 # Analyze mobility patterns for one day at district level
@@ -27,7 +27,7 @@ print(results$maps$flows)        # Shows major movement patterns
 print(results$summary)
 
 # =============================================================================
-# NEW: Efficient Data Filtering (Recommended for Users)
+# NEW: Efficient Data Filtering (Recommended for Analysts)
 # =============================================================================
 
 cat("\n=== REGIONAL FILTERING EXAMPLES ===\n")
@@ -40,13 +40,12 @@ madrid_data <- get_region_mobility("Madrid", dates = "2023-01-01", max_rows = 30
 cat("Loading Valencia province data...\n")
 valencia_data <- get_region_mobility("46", dates = "2023-01-01", max_rows = 2000)
 
-# Option 3: Filter by specific zone IDs
+# Option 3: Filter by specific zone IDs  
 cat("Loading specific zones...\n")
 madrid_barcelona_zones <- get_zones(level = "dist", zones_filter = c("28079", "08019"))
 madrid_barcelona_mobility <- get_mobility(
   dates = "2023-01-01",
   level = "dist", 
-  zones_filter = c("28079", "08019"),
   max_rows = 2000
 )
 
@@ -57,7 +56,7 @@ cat("  Valencia zones:", nrow(valencia_data$zones), "\n")
 cat("  Madrid+Barcelona zones:", nrow(madrid_barcelona_zones), "\n")
 
 # =============================================================================
-# Step-by-Step Analysis (for learning)
+# Step-by-Step Analysis (for detailed understanding)
 # =============================================================================
 
 cat("\n=== STEP-BY-STEP ANALYSIS ===\n")
@@ -67,11 +66,10 @@ cat("Step 1: Loading Madrid data...\n")
 madrid_mobility <- get_mobility(
   dates = "2023-01-01", 
   level = "dist",
-  region_filter = "Madrid",  # NEW: Filter by region
   max_rows = 5000
 )
 
-madrid_zones <- get_zones(level = "dist", region_filter = "Madrid")
+madrid_zones <- get_zones(level = "dist")
 
 # Step 2: Calculate basic mobility indicators
 cat("Step 2: Calculating mobility indicators...\n")
@@ -137,15 +135,15 @@ print("Municipality level analysis complete!")
 print(valencia_muni_results$summary)
 
 # =============================================================================
-# Learning Exercises for Users
+# Analysis Exercises for Practice
 # =============================================================================
 
-cat("\n=== LEARNING EXERCISES ===\n")
+cat("\n=== ANALYSIS EXERCISES ===\n")
 
 # Exercise 1: Compare different regions
 cat("Exercise 1: Compare different regions\n")
 madrid_data <- get_region_mobility("Madrid", dates = "2023-01-01", max_rows = 3000)
-valencia_data <- get_region_mobility("46", dates = "2023-01-01", max_rows = 3000)
+valencia_data <- get_region_mobility("Valencia", dates = "2023-01-01", max_rows = 3000)
 
 madrid_indicators <- calc_indicators(madrid_data$mobility, madrid_data$zones)
 valencia_indicators <- calc_indicators(valencia_data$mobility, valencia_data$zones)
@@ -161,10 +159,10 @@ cat("Madrid avg containment:", round(madrid_containment$summary$avg_containment,
 cat("Valencia avg containment:", round(valencia_containment$summary$avg_containment, 3), "\n")
 
 # =============================================================================
-# Best Practices for Users
+# Best Practices for Mobility Analysis
 # =============================================================================
 
-cat("\n=== BEST PRACTICES FOR USERS ===\n")
+cat("\n=== BEST PRACTICES FOR MOBILITY ANALYSIS ===\n")
 
 # 1. Always start with regional filtering to manage data size
 cat("1. Start with regional filtering:\n")
@@ -177,7 +175,7 @@ cat("   - 'muni' for detailed analysis (slower)\n")
 
 # 3. Limit data size for memory-efficient processing
 cat("3. Limit data for memory-efficient processing:\n")
-cat("   mobility <- get_mobility(region_filter = 'Madrid', max_rows = 5000)\n")
+cat("   mobility <- get_mobility(max_rows = 5000)\n")
 
 # 4. Always visualize your results
 cat("4. Always create spatial maps:\n")
@@ -193,10 +191,9 @@ cat("Remember to:\n")
 cat("  - Use filtering to manage data size\n")
 cat("  - Always visualize results with spatial maps\n")
 cat("  - Compare different regions and parameters\n")
-cat("  - Explore the data step by step\n")
+cat("  - Explore the data systematically\n")
 
-# Summary of what was learned
-cat("\nFunctions demonstrated:\n")
+cat("Functions demonstrated:\n")
 cat("  - get_region_mobility(): Get regional data in one call\n")
 cat("  - get_mobility(): Get mobility data with filtering\n")
 cat("  - get_zones(): Get spatial zones with filtering\n")
@@ -206,11 +203,6 @@ cat("  - detect_anomalies(): Find unusual patterns\n")
 cat("  - create_flows(): Visualize major movements\n")
 cat("  - predict_patterns(): Machine learning predictions\n")
 cat("  - quick_analysis(): Complete workflow in one function\n")
-
-print("Top 5 flows:")
-print(top_5_flows)
-print("Top 30 flows:")
-print(top_30_flows)
 
 cat("\n=== ANALYSIS COMPLETE ===\n")
 cat("All spatial maps have been created and are ready for analysis!\n")
