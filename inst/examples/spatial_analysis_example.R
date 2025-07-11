@@ -14,7 +14,7 @@ cat("=== QUICK SPATIAL ANALYSIS ===\n")
 
 # Analyze mobility patterns for one day at district level
 results <- quick_analysis(
-  dates = "2023-01-01",  # Single day analysis
+  dates = "2020-02-14",  # Single day analysis
   level = "dist"         # District level (administrative boundaries)
 )
 
@@ -34,26 +34,22 @@ cat("\n=== REGIONAL FILTERING EXAMPLES ===\n")
 
 # Option 1: Filter by region name (most intuitive)
 cat("Loading Madrid region data...\n")
-madrid_data <- get_region_mobility("Madrid", dates = "2023-01-01", max_rows = 3000)
+madrid_data <- get_region_mobility("Madrid", dates = "2020-02-14", max_rows = 3000)
 
 # Option 2: Filter by province code (faster)
 cat("Loading Valencia province data...\n")
-valencia_data <- get_region_mobility("46", dates = "2023-01-01", max_rows = 2000)
+valencia_data <- get_region_mobility("46", dates = "2020-02-14", max_rows = 2000)
 
-# Option 3: Filter by specific zone IDs  
-cat("Loading specific zones...\n")
-madrid_barcelona_zones <- get_zones(level = "dist", zones_filter = c("28079", "08019"))
-madrid_barcelona_mobility <- get_mobility(
-  dates = "2023-01-01",
-  level = "dist", 
-  max_rows = 2000
-)
+# Option 3: Use region filtering instead of zone IDs (more reliable)
+cat("Loading Madrid region data...\n")
+madrid_region_data <- get_region_mobility("Madrid", dates = "2020-02-14", max_rows = 2000)
+cat("Madrid region zones:", nrow(madrid_region_data$zones), "\n")
 
 # Compare data sizes
 cat("Data size comparison:\n")
 cat("  Madrid zones:", nrow(madrid_data$zones), "\n")
 cat("  Valencia zones:", nrow(valencia_data$zones), "\n") 
-cat("  Madrid+Barcelona zones:", nrow(madrid_barcelona_zones), "\n")
+cat("  Madrid region zones:", nrow(madrid_region_data$zones), "\n")
 
 # =============================================================================
 # Step-by-Step Analysis (for detailed understanding)
@@ -64,7 +60,7 @@ cat("\n=== STEP-BY-STEP ANALYSIS ===\n")
 # Step 1: Get mobility data and spatial zones (with filtering)
 cat("Step 1: Loading Madrid data...\n")
 madrid_mobility <- get_mobility(
-  dates = "2023-01-01", 
+  dates = "2020-02-14", 
   level = "dist",
   max_rows = 5000
 )
@@ -100,7 +96,7 @@ cat("\n=== MACHINE LEARNING PREDICTIONS ===\n")
 # Predict mobility patterns for next 2 days (using Madrid data)
 predictions <- predict_patterns(
   mobility_data = madrid_mobility,
-  prediction_dates = c("2023-01-08", "2023-01-09"),
+  prediction_dates = c("2020-02-15", "2020-02-16"),
   model_type = "linear_regression",
   spatial_zones = madrid_zones
 )
@@ -127,7 +123,7 @@ cat("\n=== DIFFERENT SPATIAL LEVELS ===\n")
 
 # Try municipality level for a specific region (smaller area)
 valencia_muni_results <- quick_analysis(
-  dates = "2023-01-01",
+  dates = "2020-02-14",
   level = "muni"  # Municipality level
 )
 
@@ -142,8 +138,8 @@ cat("\n=== ANALYSIS EXERCISES ===\n")
 
 # Exercise 1: Compare different regions
 cat("Exercise 1: Compare different regions\n")
-madrid_data <- get_region_mobility("Madrid", dates = "2023-01-01", max_rows = 3000)
-valencia_data <- get_region_mobility("Valencia", dates = "2023-01-01", max_rows = 3000)
+madrid_data <- get_region_mobility("Madrid", dates = "2020-02-14", max_rows = 3000)
+valencia_data <- get_region_mobility("Valencia", dates = "2020-02-14", max_rows = 3000)
 
 madrid_indicators <- calc_indicators(madrid_data$mobility, madrid_data$zones)
 valencia_indicators <- calc_indicators(valencia_data$mobility, valencia_data$zones)

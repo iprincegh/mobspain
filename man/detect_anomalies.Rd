@@ -30,8 +30,8 @@ and creates spatial maps showing anomalous zones.
 \examples{
 \dontrun{
 # Detect anomalies with spatial mapping
-mobility <- get_mobility_matrix(dates = "2023-01-01", level = "dist")
-zones <- get_spatial_zones("dist")
+mobility <- get_mobility(dates = "2023-01-01", level = "dist")
+zones <- get_zones("dist")
 
 result <- detect_anomalies_spatial(mobility, zones)
 print(result$map)  # View spatial map

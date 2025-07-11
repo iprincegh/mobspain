@@ -27,8 +27,8 @@ for users.
 \examples{
 \dontrun{
 # Complete spatial analysis
-mobility <- get_mobility_matrix(dates = "2023-01-01", level = "dist")
-zones <- get_spatial_zones("dist")
+mobility <- get_mobility(dates = "2023-01-01", level = "dist")
+zones <- get_zones("dist")
 
 results <- analyze_mobility_complete(mobility, zones)
 print(results$maps$containment)

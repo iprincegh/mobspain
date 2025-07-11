@@ -96,7 +96,7 @@ validate_time_window <- function(time_window) {
 #' @examples
 #' \dontrun{
 #' # Load mobility data
-#' mobility_data <- get_mobility_matrix(dates = c("2023-01-01", "2023-01-07"))
+#' mobility_data <- get_mobility(dates = c("2023-01-01", "2023-01-07"))
 #' 
 #' # Validate data quality
 #' quality_report <- validate_mitma_data(mobility_data)
@@ -177,7 +177,7 @@ validate_mitma_data <- function(od_data) {
 #' print(holidays_only)
 #' 
 #' # Use in mobility analysis to flag potentially unusual dates
-#' mobility_data <- get_mobility_matrix(dates = c("2023-01-01", "2023-01-07"))
+#' mobility_data <- get_mobility(dates = c("2023-01-01", "2023-01-07"))
 #' unique_dates <- unique(mobility_data$date)
 #' holiday_check <- check_spanish_holidays(unique_dates)
 #' cat("Holidays in the data:", 
@@ -231,7 +231,7 @@ check_spanish_holidays <- function(dates) {
 #' @examples
 #' \dontrun{
 #' # Validate mobility data
-#' mobility_data <- get_mobility_matrix(dates = c("2020-04-01", "2020-04-07"))
+#' mobility_data <- get_mobility(dates = c("2020-04-01", "2020-04-07"))
 #' validation <- validate_spanish_mobility_data(mobility_data, version = 1)
 #' print(validation$summary)
 #' print(validation$recommendations)

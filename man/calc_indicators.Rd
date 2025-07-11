@@ -7,7 +7,7 @@
 calc_indicators(mobility_data, spatial_zones = NULL)
 }
 \arguments{
-\item{mobility_data}{Mobility data from get_mobility_matrix()}
+\item{mobility_data}{Mobility data from get_mobility()}
 
 \item{spatial_zones}{Optional sf object with spatial zones for mapping}
 }
@@ -20,8 +20,8 @@ with automatic spatial mapping.
 }
 \examples{
 \dontrun{
-mobility <- get_mobility_matrix(dates = "2023-01-01")
-zones <- get_spatial_zones("dist")
+mobility <- get_mobility(dates = "2023-01-01")
+zones <- get_zones("dist")
 
 indicators <- calc_indicators(mobility, zones)
 print(indicators$map)

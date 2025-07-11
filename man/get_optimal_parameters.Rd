@@ -32,7 +32,7 @@ params_regional <- get_optimal_parameters("regional", "small")
 print(params_regional)
 
 # Use parameters in analysis
-mobility_data <- get_mobility_matrix(
+mobility_data <- get_mobility(
   dates = c("2023-01-01", "2023-01-07"),
   level = params_explore$spatial_level
 )

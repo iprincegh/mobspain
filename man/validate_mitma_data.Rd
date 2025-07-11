@@ -18,7 +18,7 @@ Validate MITMA data quality
 \examples{
 \dontrun{
 # Load mobility data
-mobility_data <- get_mobility_matrix(dates = c("2023-01-01", "2023-01-07"))
+mobility_data <- get_mobility(dates = c("2023-01-01", "2023-01-07"))
 
 # Validate data quality
 quality_report <- validate_mitma_data(mobility_data)

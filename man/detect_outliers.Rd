@@ -29,7 +29,7 @@ Common values:
 }}
 
 \item{spatial_zones}{sf object with spatial zones for creating maps (optional).
-Use \code{get_spatial_zones()} to obtain. Required for spatial visualization.}
+Use \code{get_zones()} to obtain. Required for spatial visualization.}
 
 \item{create_map}{Logical. Whether to create spatial map if spatial_zones provided
 (default: TRUE). Set to FALSE for faster processing without visualization.}
@@ -63,12 +63,12 @@ This method is simple to understand and explain to users.
 \examples{
 \dontrun{
 # Simple anomaly detection for users
-mobility <- get_mobility_matrix(dates = "2023-01-01")
+mobility <- get_mobility(dates = "2023-01-01")
 anomalies <- detect_simple_anomalies(mobility, threshold = 2.5)
 summary(anomalies)
 
 # With spatial mapping for analysis
-zones <- get_spatial_zones("dist")
+zones <- get_zones("dist")
 anomalies <- detect_simple_anomalies(
   mobility_data = mobility,
   threshold = 2.5,

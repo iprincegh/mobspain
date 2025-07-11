@@ -22,8 +22,8 @@ using sf geometries.
 }
 \examples{
 \dontrun{
-mobility <- get_mobility_matrix(dates = "2023-01-01")
-zones <- get_spatial_zones("dist")
+mobility <- get_mobility(dates = "2023-01-01")
+zones <- get_zones("dist")
 
 flow_map <- create_flow_map(mobility, zones, top_flows = 20)
 print(flow_map)

@@ -22,21 +22,18 @@ cat("Total mobility records:", nrow(all_mobility), "\n\n")
 # =============================================================================
 cat("=== ZONE-SPECIFIC FILTERING ===\n")
 
-# Filter by specific zone IDs (Madrid and Barcelona districts)
-madrid_barcelona_zones <- get_zones(
-  level = "dist", 
-  zones_filter = c("28079", "08019")
-)
-cat("Madrid + Barcelona zones:", nrow(madrid_barcelona_zones), "\n")
+# Note: Zone filtering by ID is available but complex due to data versioning
+# For now, we'll focus on the more reliable region-based filtering
+# If you need specific zone IDs, use region filtering instead
 
-# Get mobility data for only these zones
-madrid_barcelona_mobility <- get_mobility(
-  dates = "2020-02-14",
-  level = "dist",
-  zones_filter = c("28079", "08019"),
-  max_rows = 5000
-)
-cat("Madrid + Barcelona mobility records:", nrow(madrid_barcelona_mobility), "\n\n")
+# Example of what zone IDs look like:
+all_zones <- get_zones(level = "dist")
+sample_madrid_zones <- all_zones$id[grepl("^2807", all_zones$id)][1:3]
+sample_barcelona_zones <- all_zones$id[grepl("^0801", all_zones$id)][1:3]
+
+cat("Sample Madrid zone IDs:", paste(sample_madrid_zones, collapse = ", "), "\n")
+cat("Sample Barcelona zone IDs:", paste(sample_barcelona_zones, collapse = ", "), "\n")
+cat("For specific zone filtering, use region filtering instead\n\n")
 
 # =============================================================================
 # 3. REGION-BASED FILTERING: Download by region name

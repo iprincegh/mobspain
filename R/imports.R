@@ -25,5 +25,8 @@ globalVariables(c(
   "origin", "dest", "containment_index", "connectivity", "anomaly_count",
   "total_observations", "anomaly_rate", "anomaly_type", "predicted_trips",
   "avg_predicted_trips", "total_predicted_trips", "model_type", "lon_origin",
-  "lat_origin", "lon_dest", "lat_dest", "is_weekend", "centroid"
+  "lat_origin", "lon_dest", "lat_dest", "is_weekend", "centroid",
+  "buffer_km", "accessibility", "spatial_lag", "centroid_lon", "centroid_lat",
+  "bbox_width", "bbox_height", "perimeter_km", "compactness", "total_area",
+  "avg_trips"
 ))

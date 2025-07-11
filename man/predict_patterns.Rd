@@ -34,7 +34,7 @@ Examples: "2023-01-08" or c("2023-01-08", "2023-01-09")}
 (default: 3000 for memory-efficient processing). Larger datasets are randomly sampled.}
 
 \item{spatial_zones}{sf object with spatial zones for creating maps (optional).
-Use \code{get_spatial_zones()} to obtain. If provided, creates prediction maps.}
+Use \code{get_zones()} to obtain. If provided, creates prediction maps.}
 
 \item{create_map}{Logical. Whether to create spatial map if spatial_zones provided
 (default: TRUE). Set to FALSE for faster processing without visualization.}
@@ -74,7 +74,7 @@ hour of day, day of week, and weekend indicator.
 \examples{
 \dontrun{
 # Basic mobility prediction for users
-mobility <- get_mobility_matrix(dates = c("2023-01-01", "2023-01-05"))
+mobility <- get_mobility(dates = c("2023-01-01", "2023-01-05"))
 predictions <- predict_mobility_patterns(
   mobility_data = mobility,
   prediction_dates = c("2023-01-08", "2023-01-09"),
@@ -83,7 +83,7 @@ predictions <- predict_mobility_patterns(
 head(predictions)
 
 # With spatial mapping for analysis
-zones <- get_spatial_zones("dist")
+zones <- get_zones("dist")
 predictions <- predict_mobility_patterns(
   mobility_data = mobility,
   prediction_dates = "2023-01-08",

@@ -17,3 +17,4 @@ Data frame with spatial statistics
 \description{
 Calculate basic spatial statistics for mobility data and zones.
 }
+\keyword{internal}

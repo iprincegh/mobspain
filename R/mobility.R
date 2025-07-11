@@ -162,14 +162,14 @@ get_mobility <- function(dates = "2023-01-01", level = "dist", max_rows = 10000,
 #' Calculates essential mobility indicators for spatial analysis
 #' with automatic spatial mapping.
 #'
-#' @param mobility_data Mobility data from get_mobility_matrix()
+#' @param mobility_data Mobility data from get_mobility()
 #' @param spatial_zones Optional sf object with spatial zones for mapping
 #' @return List with mobility indicators and optional spatial map
 #' @export
 #' @examples
 #' \dontrun{
-#' mobility <- get_mobility_matrix(dates = "2023-01-01")
-#' zones <- get_spatial_zones("dist")
+#' mobility <- get_mobility(dates = "2023-01-01")
+#' zones <- get_zones("dist")
 #' 
 #' indicators <- calc_indicators(mobility, zones)
 #' print(indicators$map)
@@ -250,8 +250,8 @@ calc_indicators <- function(mobility_data, spatial_zones = NULL) {
 #' @export
 #' @examples
 #' \dontrun{
-#' mobility <- get_mobility_matrix(dates = "2023-01-01")
-#' zones <- get_spatial_zones("dist")
+#' mobility <- get_mobility(dates = "2023-01-01")
+#' zones <- get_zones("dist")
 #' 
 #' flow_map <- create_flow_map(mobility, zones, top_flows = 20)
 #' print(flow_map)
@@ -269,6 +269,10 @@ create_flows <- function(mobility_data, spatial_zones, top_flows = 20) {
     dplyr::slice_head(n = top_flows)
   
   # Get centroids of zones
+  if(!inherits(spatial_zones, "sf") || !"geometry" %in% names(spatial_zones)) {
+    stop("spatial_zones must be an sf object with geometry column")
+  }
+  
   zone_centroids <- spatial_zones %>%
     dplyr::mutate(
       lon = sf::st_coordinates(sf::st_centroid(.data$geometry))[, 1],
@@ -354,8 +358,13 @@ quick_analysis <- function(dates = "2023-01-01", level = "dist") {
   # Containment analysis
   results$containment <- calculate_containment(mobility_data, spatial_zones)
   
-  # Flow map
-  results$flows <- create_flows(mobility_data, spatial_zones, top_flows = 15)
+  # Flow map (only if geometry is available)
+  if(inherits(spatial_zones, "sf") && "geometry" %in% names(spatial_zones)) {
+    results$flows <- create_flows(mobility_data, spatial_zones, top_flows = 15)
+  } else {
+    message("Skipping flow map: spatial zones don't have geometry")
+    results$flows <- NULL
+  }
   
   # Compile maps
   results$maps <- list(
@@ -487,4 +496,238 @@ get_region_zones <- function(region_filter, level) {
     warning("Could not filter by region: ", e$message, ". Using all zones.")
     return(NULL)
   })
+}
+
+#' Enhanced spatial mobility analysis with buffer zones
+#'
+#' Performs comprehensive spatial mobility analysis using buffer-based zone selection
+#' and advanced spatial statistics. This function implements best practices for
+#' coordinate transformation and spatial analysis workflows.
+#'
+#' @param center_points Data frame with center points containing lon, lat, and optional id columns
+#' @param buffer_km Numeric. Buffer distance in kilometers around center points
+#' @param dates Character. Date(s) for mobility data (e.g., "2023-01-01")
+#' @param level Character. Administrative level ("dist" or "muni")
+#' @param max_rows Numeric. Maximum rows for mobility data (default: 10000)
+#' @param create_maps Logical. Whether to create spatial maps (default: TRUE)
+#' @return List containing:
+#'   \itemize{
+#'     \item zones - sf object with zones in buffer area
+#'     \item mobility - mobility data filtered to buffer zones
+#'     \item spatial_stats - spatial statistics for the area
+#'     \item maps - list of ggplot maps (if create_maps = TRUE)
+#'   }
+#' @export
+#' @examples
+#' \dontrun{
+#' # Analyze mobility around Madrid center
+#' madrid_center <- data.frame(lon = -3.7038, lat = 40.4168, id = "Madrid")
+#' madrid_analysis <- analyze_mobility_buffer(
+#'   center_points = madrid_center,
+#'   buffer_km = 25,
+#'   dates = "2020-02-14"
+#' )
+#' 
+#' # View results
+#' print(madrid_analysis$maps$zones)
+#' print(madrid_analysis$maps$mobility)
+#' print(madrid_analysis$spatial_stats)
+#' }
+analyze_mobility_buffer <- function(center_points, buffer_km, dates, level = "dist", 
+                                   max_rows = 10000, create_maps = TRUE) {
+  
+  message("=== ENHANCED SPATIAL MOBILITY ANALYSIS ===")
+  
+  # Step 1: Get all zones and apply buffer selection
+  message("Step 1: Loading zones and applying buffer selection...")
+  all_zones <- get_zones(level = level)
+  
+  buffer_zones <- get_zones_buffer(
+    zones = all_zones,
+    center_points = center_points,
+    buffer_km = buffer_km
+  )
+  
+  message("Selected ", nrow(buffer_zones), " zones within ", buffer_km, "km buffer")
+  
+  # Step 2: Get mobility data for buffer zones
+  message("Step 2: Loading mobility data for buffer zones...")
+  mobility_data <- get_mobility(
+    dates = dates,
+    level = level,
+    max_rows = max_rows
+  )
+  
+  # Filter mobility to buffer zones
+  buffer_mobility <- mobility_data %>%
+    dplyr::filter(
+      .data$origin %in% buffer_zones$id,
+      .data$dest %in% buffer_zones$id
+    )
+  
+  message("Filtered to ", nrow(buffer_mobility), " mobility records within buffer area")
+  
+  # Step 3: Calculate enhanced spatial statistics
+  message("Step 3: Calculating enhanced spatial statistics...")
+  
+  # Basic mobility statistics
+  origin_stats <- buffer_mobility %>%
+    dplyr::group_by(.data$origin) %>%
+    dplyr::summarise(
+      total_trips_out = sum(.data$n_trips, na.rm = TRUE),
+      unique_destinations = dplyr::n_distinct(.data$dest),
+      avg_trip_flow = mean(.data$n_trips, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    dplyr::rename(id = .data$origin)
+  
+  dest_stats <- buffer_mobility %>%
+    dplyr::group_by(.data$dest) %>%
+    dplyr::summarise(
+      total_trips_in = sum(.data$n_trips, na.rm = TRUE),
+      unique_origins = dplyr::n_distinct(.data$origin),
+      .groups = "drop"
+    ) %>%
+    dplyr::rename(id = .data$dest)
+  
+  # Merge with zone data
+  enhanced_zones <- buffer_zones %>%
+    dplyr::left_join(origin_stats, by = "id") %>%
+    dplyr::left_join(dest_stats, by = "id") %>%
+    dplyr::mutate(
+      total_trips_out = ifelse(is.na(.data$total_trips_out), 0, .data$total_trips_out),
+      total_trips_in = ifelse(is.na(.data$total_trips_in), 0, .data$total_trips_in),
+      unique_destinations = ifelse(is.na(.data$unique_destinations), 0, .data$unique_destinations),
+      unique_origins = ifelse(is.na(.data$unique_origins), 0, .data$unique_origins),
+      net_flow = .data$total_trips_in - .data$total_trips_out,
+      trip_balance = ifelse(.data$total_trips_out > 0, 
+                           .data$total_trips_in / .data$total_trips_out, 0),
+      connectivity_out = .data$unique_destinations / nrow(buffer_zones),
+      connectivity_in = .data$unique_origins / nrow(buffer_zones)
+    )
+  
+  # Calculate spatial accessibility
+  message("Step 4: Calculating spatial accessibility...")
+  accessibility_matrix <- calculate_accessibility_matrix(
+    zones = enhanced_zones,
+    max_distance_km = buffer_km * 1.5
+  )
+  
+  enhanced_zones$accessibility <- rowSums(accessibility_matrix)
+  
+  # Calculate spatial lags
+  message("Step 5: Calculating spatial lag variables...")
+  if(nrow(enhanced_zones) > 1) {
+    enhanced_zones$trips_out_lag <- calculate_spatial_lag(
+      zones = enhanced_zones,
+      variable = "total_trips_out",
+      method = "distance",
+      max_distance_km = buffer_km * 0.5
+    )
+    
+    enhanced_zones$trips_in_lag <- calculate_spatial_lag(
+      zones = enhanced_zones,
+      variable = "total_trips_in",
+      method = "distance",
+      max_distance_km = buffer_km * 0.5
+    )
+  } else {
+    enhanced_zones$trips_out_lag <- 0
+    enhanced_zones$trips_in_lag <- 0
+  }
+  
+  # Spatial autocorrelation
+  if(nrow(enhanced_zones) > 1) {
+    trips_out_centered <- enhanced_zones$total_trips_out - mean(enhanced_zones$total_trips_out, na.rm = TRUE)
+    trips_out_lag_centered <- enhanced_zones$trips_out_lag - mean(enhanced_zones$trips_out_lag, na.rm = TRUE)
+    
+    morans_i_out <- sum(trips_out_centered * trips_out_lag_centered, na.rm = TRUE) / 
+                   sum(trips_out_centered^2, na.rm = TRUE)
+  } else {
+    morans_i_out <- 0
+  }
+  
+  # Compile spatial statistics
+  spatial_stats <- list(
+    buffer_info = list(
+      center_points = center_points,
+      buffer_km = buffer_km,
+      total_zones = nrow(enhanced_zones),
+      total_area_km2 = sum(enhanced_zones$area_km2, na.rm = TRUE)
+    ),
+    mobility_summary = list(
+      total_trips = sum(buffer_mobility$n_trips, na.rm = TRUE),
+      internal_trips = sum(buffer_mobility$n_trips[buffer_mobility$origin == buffer_mobility$dest], na.rm = TRUE),
+      avg_trip_flow = mean(buffer_mobility$n_trips, na.rm = TRUE),
+      containment_rate = sum(buffer_mobility$n_trips[buffer_mobility$origin == buffer_mobility$dest], na.rm = TRUE) / 
+                        sum(buffer_mobility$n_trips, na.rm = TRUE)
+    ),
+    spatial_measures = list(
+      mean_accessibility = mean(enhanced_zones$accessibility, na.rm = TRUE),
+      morans_i_outflow = morans_i_out,
+      mean_connectivity_out = mean(enhanced_zones$connectivity_out, na.rm = TRUE),
+      mean_connectivity_in = mean(enhanced_zones$connectivity_in, na.rm = TRUE)
+    )
+  )
+  
+  # Create maps if requested
+  maps <- NULL
+  if(create_maps) {
+    message("Step 6: Creating spatial maps...")
+    
+    # Zone overview map
+    zones_map <- ggplot2::ggplot() +
+      ggplot2::geom_sf(data = all_zones, fill = "lightgray", color = "white", size = 0.1) +
+      ggplot2::geom_sf(data = enhanced_zones, fill = "red", alpha = 0.6, color = "darkred") +
+      ggplot2::geom_point(data = center_points, 
+                         ggplot2::aes(x = .data$lon, y = .data$lat), 
+                         color = "blue", size = 3) +
+      ggplot2::labs(title = paste("Buffer Zone Selection (", buffer_km, "km)"),
+                   subtitle = paste("Selected", nrow(enhanced_zones), "zones")) +
+      ggplot2::theme_void()
+    
+    # Mobility outflow map
+    mobility_map <- ggplot2::ggplot(enhanced_zones) +
+      ggplot2::geom_sf(ggplot2::aes(fill = .data$total_trips_out), color = "white", size = 0.1) +
+      ggplot2::scale_fill_viridis_c(name = "Total Trips\n(Origin)", 
+                                   option = "plasma", trans = "sqrt") +
+      ggplot2::labs(title = "Mobility Outflow Patterns",
+                   subtitle = paste("Date:", dates, "- Buffer:", buffer_km, "km")) +
+      ggplot2::theme_void()
+    
+    # Accessibility map
+    accessibility_map <- ggplot2::ggplot(enhanced_zones) +
+      ggplot2::geom_sf(ggplot2::aes(fill = .data$accessibility), color = "white", size = 0.1) +
+      ggplot2::scale_fill_viridis_c(name = "Accessibility\nIndex", 
+                                   option = "viridis", trans = "sqrt") +
+      ggplot2::labs(title = "Spatial Accessibility",
+                   subtitle = "Higher values indicate better accessibility") +
+      ggplot2::theme_void()
+    
+    # Net flow map
+    net_flow_map <- ggplot2::ggplot(enhanced_zones) +
+      ggplot2::geom_sf(ggplot2::aes(fill = .data$net_flow), color = "white", size = 0.1) +
+      ggplot2::scale_fill_gradient2(name = "Net Flow", 
+                                   low = "red", mid = "white", high = "blue",
+                                   midpoint = 0) +
+      ggplot2::labs(title = "Net Mobility Flow",
+                   subtitle = "Blue: Net inflow, Red: Net outflow") +
+      ggplot2::theme_void()
+    
+    maps <- list(
+      zones = zones_map,
+      mobility = mobility_map,
+      accessibility = accessibility_map,
+      net_flow = net_flow_map
+    )
+  }
+  
+  message("=== ENHANCED SPATIAL ANALYSIS COMPLETE ===")
+  
+  return(list(
+    zones = enhanced_zones,
+    mobility = buffer_mobility,
+    spatial_stats = spatial_stats,
+    maps = maps
+  ))
 }

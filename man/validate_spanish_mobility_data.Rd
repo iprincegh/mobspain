@@ -32,7 +32,7 @@ Validate Spanish mobility data comprehensively
 \examples{
 \dontrun{
 # Validate mobility data
-mobility_data <- get_mobility_matrix(dates = c("2020-04-01", "2020-04-07"))
+mobility_data <- get_mobility(dates = c("2020-04-01", "2020-04-07"))
 validation <- validate_spanish_mobility_data(mobility_data, version = 1)
 print(validation$summary)
 print(validation$recommendations)

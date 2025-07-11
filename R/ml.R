@@ -25,7 +25,7 @@
 #' @param max_rows Numeric. Maximum number of rows to use for training 
 #'   (default: 3000 for memory-efficient processing). Larger datasets are randomly sampled.
 #' @param spatial_zones sf object with spatial zones for creating maps (optional).
-#'   Use \code{get_spatial_zones()} to obtain. If provided, creates prediction maps.
+#'   Use \code{get_zones()} to obtain. If provided, creates prediction maps.
 #' @param create_map Logical. Whether to create spatial map if spatial_zones provided 
 #'   (default: TRUE). Set to FALSE for faster processing without visualization.
 #' @return List containing:
@@ -52,7 +52,7 @@
 #' @examples
 #' \dontrun{
 #' # Basic mobility prediction for users
-#' mobility <- get_mobility_matrix(dates = c("2023-01-01", "2023-01-05"))
+#' mobility <- get_mobility(dates = c("2023-01-01", "2023-01-05"))
 #' predictions <- predict_mobility_patterns(
 #'   mobility_data = mobility,
 #'   prediction_dates = c("2023-01-08", "2023-01-09"),
@@ -61,7 +61,7 @@
 #' head(predictions)
 #' 
 #' # With spatial mapping for analysis
-#' zones <- get_spatial_zones("dist")
+#' zones <- get_zones("dist")
 #' predictions <- predict_mobility_patterns(
 #'   mobility_data = mobility,
 #'   prediction_dates = "2023-01-08",
@@ -283,7 +283,7 @@ create_simple_prediction_data <- function(prediction_dates) {
 #'     \item 3.0 - Conservative (detects fewer, strong anomalies only)
 #'   }
 #' @param spatial_zones sf object with spatial zones for creating maps (optional).
-#'   Use \code{get_spatial_zones()} to obtain. Required for spatial visualization.
+#'   Use \code{get_zones()} to obtain. Required for spatial visualization.
 #' @param create_map Logical. Whether to create spatial map if spatial_zones provided 
 #'   (default: TRUE). Set to FALSE for faster processing without visualization.
 #' @return List containing:
@@ -308,12 +308,12 @@ create_simple_prediction_data <- function(prediction_dates) {
 #' @examples
 #' \dontrun{
 #' # Simple anomaly detection for users
-#' mobility <- get_mobility_matrix(dates = "2023-01-01")
+#' mobility <- get_mobility(dates = "2023-01-01")
 #' anomalies <- detect_simple_anomalies(mobility, threshold = 2.5)
 #' summary(anomalies)
 #' 
 #' # With spatial mapping for analysis
-#' zones <- get_spatial_zones("dist")
+#' zones <- get_zones("dist")
 #' anomalies <- detect_simple_anomalies(
 #'   mobility_data = mobility,
 #'   threshold = 2.5,

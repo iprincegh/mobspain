@@ -144,6 +144,35 @@
 #'   }
 #' }
 #' }
+#' 
+#' \subsection{Advanced Spatial Analysis Functions:}{
+#' \describe{
+#'   \item{\code{\link{get_zones_buffer}}}{Buffer-based zone selection
+#'     \itemize{
+#'       \item \code{zones} - sf object with zone geometries
+#'       \item \code{center_points} - Data frame with center coordinates
+#'       \item \code{buffer_km = 10} - Buffer distance in kilometers
+#'       \item \code{crs_proj = 25830} - Projected CRS for calculations
+#'     }
+#'   }
+#'   \item{\code{\link{calculate_accessibility_matrix}}}{Spatial accessibility analysis
+#'     \itemize{
+#'       \item \code{zones} - sf object with zone geometries
+#'       \item \code{decay_function = "exponential"} - Distance decay function
+#'       \item \code{max_distance_km = 50} - Maximum distance for calculations
+#'       \item \code{decay_parameter = 0.1} - Decay parameter
+#'     }
+#'   }
+#'   \item{\code{\link{calculate_spatial_lag}}}{Spatial lag variable calculation
+#'     \itemize{
+#'       \item \code{zones} - sf object with zone geometries and attributes
+#'       \item \code{variable} - Name of variable to calculate lag for
+#'       \item \code{method = "contiguity"} - Spatial weights method
+#'       \item \code{k = 5} - Number of neighbors for knn method
+#'     }
+#'   }
+#' }
+#' }
 #'
 #' @section Parameter Details:
 #' 
