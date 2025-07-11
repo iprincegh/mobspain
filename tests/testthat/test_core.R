@@ -1,40 +1,50 @@
-test_that("Database connection handles errors gracefully", {
-  # Unset data directory
-  options(mobspain.data_dir = NULL)
-
-  # Test without initialization
-  expect_error(connect_mobility_db(), "Run init_data_dir")
-
-  # Test with valid directory
-  test_dir <- tempfile()
-  dir.create(test_dir)
-  init_data_dir(test_dir)
-
-  # Should return connection
-  con <- suppressWarnings(connect_mobility_db())
-  expect_s4_class(con, "DBIConnection")
-  DBI::dbDisconnect(con, shutdown = TRUE)
-
-  unlink(test_dir, recursive = TRUE)
+test_that("Package configuration works", {
+  # Test basic configuration
+  expect_no_error(configure_mobspain())
+  
+  # Test configuration with custom cache directory
+  temp_cache <- tempdir()
+  expect_no_error(configure_mobspain(cache_dir = temp_cache))
+  
+  # Test configuration with parameters
+  expect_no_error(configure_mobspain(max_cache_size = 100, parallel = FALSE))
 })
 
-test_that("Mobility data retrieval works", {
-  skip_on_cran()
-  skip_if_offline()
+test_that("Sample data is available", {
+  # Test that sample_zones dataset exists and has correct structure
+  data("sample_zones", package = "mobspain")
+  expect_s3_class(sample_zones, "data.frame")
+  expect_true("id" %in% names(sample_zones))
+  expect_true("name" %in% names(sample_zones))
+  expect_true("population" %in% names(sample_zones))
+})
 
-  test_dir <- tempfile()
-  init_data_dir(test_dir)
+test_that("Mobility data function parameters validate correctly", {
+  # Test that get_mobility validates input parameters
+  expect_error(get_mobility(dates = "invalid-date"))
+  expect_error(get_mobility(level = "invalid-level"))
+  expect_error(get_mobility(max_rows = -1))
+})
 
-  # Use small date range
-  dates <- c("2023-01-01", "2023-01-01")
+test_that("Mobility status function works", {
+  # Test that mobspain_status returns appropriate information
+  status <- mobspain_status()
+  expect_s3_class(status, "mobspain_status")
+  expect_true(is.list(status))
+})
 
-  # Use fallback method
-  data <- suppressWarnings(
-    get_mobility_matrix(dates, level = "dist")
+test_that("Validation functions work correctly", {
+  # Test Spanish mobility data validation
+  expect_error(validate_mitma_data(NULL))
+  
+  # Test with minimal valid data structure
+  test_data <- data.frame(
+    id_origin = c("28079", "08019"),
+    id_destination = c("08019", "28079"),
+    date = as.Date(c("2023-01-01", "2023-01-01")),
+    n_trips = c(100, 150)
   )
-
-  expect_s3_class(data, "data.frame")
-  expect_true("n_trips" %in% names(data))
-
-  unlink(test_dir, recursive = TRUE)
+  
+  # Expect a warning about weekend/weekday distribution for minimal test data
+  expect_warning(validate_mitma_data(test_data), "Unusual weekend/weekday data distribution")
 })
