@@ -15,7 +15,7 @@ library(mobspain)
 
 ```r
 # Complete analysis in one function
-results <- quick_analysis(dates = "2023-01-01", level = "dist")
+results <- quick_analysis(dates = "2020-02-14", level = "dist")
 print(results$maps$indicators)   # View mobility map
 ```
 
@@ -23,9 +23,9 @@ print(results$maps$indicators)   # View mobility map
 
 ### Data Access
 
-#### `get_mobility(dates = "2023-01-01", level = "dist", max_rows = 10000, zones_filter = NULL, region_filter = NULL)`
+#### `get_mobility(dates = "2020-02-14", level = "dist", max_rows = 10000, zones_filter = NULL, region_filter = NULL)`
 Get mobility data between zones
-- `dates`: Date(s) as string or vector ("2023-01-01" or c("2023-01-01", "2023-01-03"))
+- `dates`: Date(s) as string or vector ("2020-02-14" or c("2020-02-14", "2020-02-16"))
 - `level`: Spatial level ("dist", "muni", "prov")
 - `max_rows`: Maximum rows to return (default: 10000 for memory management)
 - `zones_filter`: Specific zone IDs to filter by
@@ -38,7 +38,7 @@ Get administrative boundaries with geometries
 - `zones_filter`: Specific zone IDs to filter by
 - `region_filter`: Region name or province code to filter by
 
-#### `get_region_mobility(region, dates = "2023-01-01", level = "dist", max_rows = 10000)`
+#### `get_region_mobility(region, dates = "2020-02-14", level = "dist", max_rows = 10000)`
 Get both mobility data and zones for a region
 - `region`: Region name or province code
 - `dates`: Date(s) to get mobility data for
@@ -90,7 +90,7 @@ Create spatial maps from analysis results
 
 ### Quick Analysis
 
-#### `quick_analysis(dates = "2023-01-01", level = "dist")`
+#### `quick_analysis(dates = "2020-02-14", level = "dist")`
 Complete spatial analysis workflow
 - `dates`: Date(s) to analyze
 - `level`: Spatial level
@@ -100,7 +100,7 @@ Complete spatial analysis workflow
 ### Basic Usage
 ```r
 # Get mobility data and zones
-mobility <- get_mobility(dates = "2023-01-01", level = "dist")
+mobility <- get_mobility(dates = "2020-02-14", level = "dist")
 zones <- get_zones(level = "dist")
 
 # Quick analysis
@@ -111,7 +111,7 @@ print(indicators$map)
 ### Regional Analysis
 ```r
 # Get regional data
-madrid_data <- get_region_mobility("Madrid", dates = "2023-01-01")
+madrid_data <- get_region_mobility("Madrid", dates = "2020-02-14")
 
 # Analyze containment
 containment <- calculate_containment(madrid_data$mobility, madrid_data$zones)
@@ -121,13 +121,13 @@ print(containment$map)
 ### Filtering Examples
 ```r
 # Filter by region name
-madrid_mobility <- get_mobility(dates = "2023-01-01", region_filter = "Madrid")
+madrid_mobility <- get_mobility(dates = "2020-02-14", region_filter = "Madrid")
 
 # Filter by province code
-valencia_mobility <- get_mobility(dates = "2023-01-01", region_filter = "46")
+valencia_mobility <- get_mobility(dates = "2020-02-14", region_filter = "46")
 
 # Filter by specific zones
-specific_zones <- get_mobility(dates = "2023-01-01", zones_filter = c("28079", "08019"))
+specific_zones <- get_mobility(dates = "2020-02-14", zones_filter = c("28079", "08019"))
 ```
 
 ## Configuration
