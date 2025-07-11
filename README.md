@@ -15,7 +15,7 @@ library(mobspain)
 
 ```r
 # Complete analysis in one function
-results <- quick_spatial_analysis(dates = "2023-01-01", level = "dist")
+results <- quick_analysis(dates = "2023-01-01", level = "dist")
 print(results$maps$indicators)   # View mobility map
 ```
 
@@ -23,25 +23,27 @@ print(results$maps$indicators)   # View mobility map
 
 ### Data Access
 
-#### `get_mobility(dates, level, zones_filter = NULL, region_filter = NULL, max_rows = NULL)`
+#### `get_mobility(dates = "2023-01-01", level = "dist", max_rows = 10000, zones_filter = NULL, region_filter = NULL)`
 Get mobility data between zones
 - `dates`: Date(s) as string or vector ("2023-01-01" or c("2023-01-01", "2023-01-03"))
 - `level`: Spatial level ("dist", "muni", "prov")
+- `max_rows`: Maximum rows to return (default: 10000 for memory management)
 - `zones_filter`: Specific zone IDs to filter by
 - `region_filter`: Region name or province code to filter by
-- `max_rows`: Maximum rows to return (for memory management)
 
-#### `get_zones(level, zones_filter = NULL, region_filter = NULL)`
+#### `get_zones(level = "dist", year = 2023, zones_filter = NULL, region_filter = NULL)`
 Get administrative boundaries with geometries
 - `level`: Spatial level ("dist", "muni", "prov")
+- `year`: Year for administrative boundaries (default: 2023)
 - `zones_filter`: Specific zone IDs to filter by
 - `region_filter`: Region name or province code to filter by
 
-#### `get_region_mobility(region, dates = NULL, level = "dist")`
+#### `get_region_mobility(region, dates = "2023-01-01", level = "dist", max_rows = 10000)`
 Get both mobility data and zones for a region
 - `region`: Region name or province code
 - `dates`: Date(s) to get mobility data for
 - `level`: Spatial level
+- `max_rows`: Maximum rows to return (default: 10000)
 
 ### Spatial Analysis
 
@@ -51,11 +53,11 @@ Calculate how much mobility stays within zones
 - `spatial_zones`: sf object with zone geometries
 - `create_map`: Whether to create spatial map
 
-#### `detect_anomalies(mobility_data, spatial_zones = NULL, threshold = 2.5, create_map = TRUE)`
+#### `detect_anomalies(mobility_data, threshold = 2.5, spatial_zones = NULL, create_map = TRUE)`
 Find unusual mobility patterns
 - `mobility_data`: Output from `get_mobility()`
-- `spatial_zones`: sf object with zone geometries
 - `threshold`: Number of standard deviations for anomaly detection
+- `spatial_zones`: sf object with zone geometries
 - `create_map`: Whether to create spatial map
 
 #### `predict_patterns(mobility_data, prediction_dates, model_type = "linear_regression", spatial_zones = NULL, create_map = TRUE)`
@@ -66,20 +68,18 @@ Predict future mobility patterns
 - `spatial_zones`: sf object with zone geometries
 - `create_map`: Whether to create spatial map
 
-#### `calc_indicators(mobility_data, spatial_zones = NULL, create_map = TRUE)`
+#### `calc_indicators(mobility_data, spatial_zones = NULL)`
 Calculate basic mobility indicators
 - `mobility_data`: Output from `get_mobility()`
 - `spatial_zones`: sf object with zone geometries
-- `create_map`: Whether to create spatial map
 
 ### Visualization
 
-#### `create_flows(mobility_data, spatial_zones, top_flows = 20, min_trips = NULL)`
+#### `create_flows(mobility_data, spatial_zones, top_flows = 20)`
 Create flow maps showing movement between zones
 - `mobility_data`: Output from `get_mobility()`
 - `spatial_zones`: sf object with zone geometries
 - `top_flows`: Number of top flows to display
-- `min_trips`: Minimum number of trips to display flow
 
 #### `create_spatial_map(analysis_result, spatial_zones, map_type = "auto", title = NULL)`
 Create spatial maps from analysis results
@@ -90,11 +90,10 @@ Create spatial maps from analysis results
 
 ### Quick Analysis
 
-#### `quick_spatial_analysis(dates, level = "dist", region_filter = NULL)`
+#### `quick_analysis(dates = "2023-01-01", level = "dist")`
 Complete spatial analysis workflow
 - `dates`: Date(s) to analyze
 - `level`: Spatial level
-- `region_filter`: Region to focus on
 
 ## Examples
 
