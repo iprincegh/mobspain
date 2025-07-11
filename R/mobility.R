@@ -116,10 +116,13 @@ get_mobility <- function(dates = "2023-01-01", level = "dist", max_rows = 10000,
   
   # Get the data
   mobility_data <- tryCatch({
-    spanishoddata::spod_get(
+    mobility_raw <- spanishoddata::spod_get(
+      type = "od",
       dates = dates,
       zones = level
     )
+    # Convert to data frame for easier handling
+    mobility_raw %>% dplyr::collect()
   }, error = function(e) {
     stop("Failed to download mobility data: ", e$message)
   })
@@ -128,7 +131,7 @@ get_mobility <- function(dates = "2023-01-01", level = "dist", max_rows = 10000,
   if(!is.null(zones_to_filter)) {
     original_rows <- nrow(mobility_data)
     mobility_data <- mobility_data %>%
-      dplyr::filter(.data$id_origin %in% zones_to_filter | .data$id_dest %in% zones_to_filter)
+      dplyr::filter(.data$id_origin %in% zones_to_filter | .data$id_destination %in% zones_to_filter)
     message("Step 3: Filtered to ", nrow(mobility_data), " rows (from ", original_rows, ") based on zone filter")
   }
   
@@ -142,7 +145,7 @@ get_mobility <- function(dates = "2023-01-01", level = "dist", max_rows = 10000,
   mobility_data <- mobility_data %>%
     dplyr::select(
       origin = .data$id_origin,
-      dest = .data$id_dest, 
+      dest = .data$id_destination, 
       date = .data$date,
       n_trips = .data$n_trips
     ) %>%
@@ -449,7 +452,7 @@ get_region_zones <- function(region_filter, level) {
   }
   
   tryCatch({
-    zones <- spanishoddata::spod_get_zones(level = level, year = 2023)
+    zones <- spanishoddata::spod_get_zones(zones = level, ver = 1)
     
     # Try to match by different criteria
     if(nchar(region_filter) <= 2 && grepl("^[0-9]+$", region_filter)) {

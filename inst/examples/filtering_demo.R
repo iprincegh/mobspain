@@ -14,7 +14,7 @@ all_zones <- get_zones(level = "dist")
 cat("Total zones available:", nrow(all_zones), "\n")
 
 # Get mobility data for all zones (with memory management)
-all_mobility <- get_mobility(dates = "2023-01-01", level = "dist", max_rows = 5000)
+all_mobility <- get_mobility(dates = "2020-02-14", level = "dist", max_rows = 5000)
 cat("Total mobility records:", nrow(all_mobility), "\n\n")
 
 # =============================================================================
@@ -31,7 +31,7 @@ cat("Madrid + Barcelona zones:", nrow(madrid_barcelona_zones), "\n")
 
 # Get mobility data for only these zones
 madrid_barcelona_mobility <- get_mobility(
-  dates = "2023-01-01",
+  dates = "2020-02-14",
   level = "dist",
   zones_filter = c("28079", "08019"),
   max_rows = 5000
@@ -49,7 +49,7 @@ cat("Madrid region zones:", nrow(madrid_zones), "\n")
 
 # Get mobility data for Madrid region
 madrid_mobility <- get_mobility(
-  dates = "2023-01-01",
+  dates = "2020-02-14",
   level = "dist", 
   region_filter = "Madrid",
   max_rows = 3000
@@ -67,7 +67,7 @@ cat("Valencia province zones:", nrow(valencia_zones), "\n")
 
 # Get mobility data for Valencia province
 valencia_mobility <- get_mobility(
-  dates = "2023-01-01",
+  dates = "2020-02-14",
   level = "dist",
   region_filter = "46",
   max_rows = 2000
@@ -82,7 +82,7 @@ cat("=== CONVENIENCE FUNCTION ===\n")
 # Get both mobility data and zones for Barcelona in one call
 barcelona_data <- get_region_mobility(
   region = "Barcelona",
-  dates = "2023-01-01",
+  dates = "2020-02-14",
   level = "dist",
   max_rows = 2000
 )
@@ -98,7 +98,7 @@ cat("  - Region:", barcelona_data$region, "\n\n")
 cat("=== COMPLETE REGIONAL ANALYSIS ===\n")
 
 # Get Madrid data and run a complete spatial analysis
-madrid_data <- get_region_mobility("Madrid", dates = "2023-01-01", max_rows = 3000)
+madrid_data <- get_region_mobility("Madrid", dates = "2020-02-14", max_rows = 3000)
 
 # Calculate mobility indicators with spatial mapping
 madrid_indicators <- calc_indicators(madrid_data$mobility, madrid_data$zones)

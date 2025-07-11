@@ -80,7 +80,7 @@ get_zones <- function(level = "dist", year = 2023, zones_filter = NULL, region_f
   }
   
   # Get spatial zones
-  zones <- spanishoddata::spod_get_zones(level = level, year = year)
+  zones <- spanishoddata::spod_get_zones(zones = level, ver = 1)
   
   # Ensure it's an sf object
   if(!inherits(zones, "sf")) {
