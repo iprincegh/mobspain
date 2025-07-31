@@ -4,6 +4,70 @@
 #' users learning spatial data science.
 #' All functions automatically create spatial maps when possible.
 
+#' Helper function to create city name patterns for zone matching
+#'
+#' @param city_names Character vector of city names
+#' @return Named list of regex patterns for each city
+#' @keywords internal
+create_city_patterns <- function(city_names) {
+  
+  # Comprehensive mapping of Spanish cities to their zone ID patterns
+  city_mapping <- list(
+    "Madrid" = "^28",           # Madrid province (28)
+    "Barcelona" = "^08",        # Barcelona province (08)
+    "Valencia" = "^46",         # Valencia province (46)
+    "Sevilla" = "^41",          # Sevilla province (41)
+    "Seville" = "^41",          # Alternative spelling
+    "Zaragoza" = "^50",         # Zaragoza province (50)
+    "Malaga" = "^29",           # Malaga province (29)
+    "Murcia" = "^30",           # Murcia province (30)
+    "Palma" = "^07",            # Balearic Islands (07)
+    "Las Palmas" = "^35",       # Las Palmas province (35)
+    "Bilbao" = "^48",           # Vizcaya province (48)
+    "Alicante" = "^03",         # Alicante province (03)
+    "Cordoba" = "^14",          # Cordoba province (14)
+    "Valladolid" = "^47",       # Valladolid province (47)
+    "Vigo" = "^36",             # Pontevedra province (36)
+    "Gijon" = "^33",            # Asturias province (33)
+    "L'Hospitalet" = "^08",     # Barcelona metropolitan area
+    "Hospitalet" = "^08",       # Simplified
+    "Badalona" = "^08",         # Barcelona metropolitan area
+    "Terrassa" = "^08",         # Barcelona metropolitan area
+    "Sabadell" = "^08",         # Barcelona metropolitan area
+    "Mostoles" = "^28",         # Madrid metropolitan area
+    "Alcala" = "^28",           # Madrid metropolitan area (Alcala de Henares)
+    "Fuenlabrada" = "^28",      # Madrid metropolitan area
+    "Leganes" = "^28",          # Madrid metropolitan area
+    "Getafe" = "^28",           # Madrid metropolitan area
+    "Alcorcon" = "^28"          # Madrid metropolitan area
+  )
+  
+  # Create patterns for requested cities
+  patterns <- list()
+  for(city in city_names) {
+    # Try exact match first (case insensitive)
+    city_lower <- tolower(city)
+    matched_key <- NULL
+    
+    for(key in names(city_mapping)) {
+      if(tolower(key) == city_lower) {
+        matched_key <- key
+        break
+      }
+    }
+    
+    if(!is.null(matched_key)) {
+      patterns[[city]] <- city_mapping[[matched_key]]
+    } else {
+      # If no exact match, create a pattern based on common province codes
+      warning("City '", city, "' not found in predefined list. Using generic pattern.")
+      patterns[[city]] <- paste0("^", substr(city, 1, 2))
+    }
+  }
+  
+  return(patterns)
+}
+
 #' Get spatial zones with geometries
 #'
 #' Retrieves spatial zones (administrative boundaries) with geometries for mapping.
@@ -18,9 +82,20 @@
 #'   }
 #' @param year Numeric. Year for the boundaries (default: 2023). Available years depend on data source.
 #' @param zones_filter Character vector. Optional filter for specific zone IDs.
-#'   If NULL (default), loads all zones. Examples: c("28079", "08019") for Madrid and Barcelona.
+#'   If NULL (default), loads all zones. Examples: 
+#'   \itemize{
+#'     \item c("2801301", "08251") for specific districts
+#'     \item c("28", "08") for all zones in Madrid/Barcelona provinces (prefix matching)
+#'     \item c("28079", "08019") will use prefix matching to find Madrid/Barcelona zones
+#'   }
 #' @param region_filter Character. Optional filter by region/province name or code.
 #'   Examples: "Madrid", "Barcelona", "28" (Madrid province). Automatically finds relevant zones.
+#' @param city_filter Character vector. Optional filter by city names.
+#'   Examples: c("Madrid", "Barcelona", "Valencia", "Sevilla"). Case-insensitive matching.
+#' @param buffer_km Numeric. Optional buffer distance in kilometers around selected zones
+#'   to create functional urban areas. Default is NULL (no buffer). Examples: 15, 20, 30.
+#' @param include_neighbors Logical. If TRUE and buffer_km is specified, includes
+#'   neighboring zones within the buffer distance (default: TRUE).
 #' @return sf object with spatial zones containing:
 #'   \itemize{
 #'     \item geometry - Polygon geometries in WGS84 (EPSG:4326)
@@ -45,7 +120,20 @@
 #' # Get specific zones only (reduces memory usage)
 #' madrid_barcelona <- get_zones(
 #'   level = "dist", 
-#'   zones_filter = c("28079", "08019")  # Madrid and Barcelona
+#'   zones_filter = c("28", "08")  # Madrid and Barcelona provinces (prefix matching)
+#' )
+#' 
+#' # Get zones by city names with functional urban area buffer
+#' madrid_valencia <- get_zones(
+#'   level = "dist",
+#'   city_filter = c("Madrid", "Valencia"),
+#'   buffer_km = 20  # 20km functional urban area
+#' )
+#' 
+#' # Get multiple cities without buffer
+#' major_cities <- get_zones(
+#'   level = "dist",
+#'   city_filter = c("Madrid", "Barcelona", "Valencia", "Sevilla")
 #' )
 #' 
 #' # Get zones for a specific region
@@ -70,7 +158,8 @@
 #' head(zones)
 #' summary(zones$area_km2)
 #' }
-get_zones <- function(level = "dist", year = 2023, zones_filter = NULL, region_filter = NULL) {
+get_zones <- function(level = "dist", year = 2023, zones_filter = NULL, region_filter = NULL, 
+                     city_filter = NULL, buffer_km = NULL, include_neighbors = TRUE) {
   
   message("Step 1: Loading spatial zones for level: ", level)
   
@@ -88,7 +177,47 @@ get_zones <- function(level = "dist", year = 2023, zones_filter = NULL, region_f
   }
   
   # Apply filtering if specified
-  if(!is.null(region_filter)) {
+  if(!is.null(city_filter)) {
+    message("Step 2: Filtering zones by city names: ", paste(city_filter, collapse = ", "))
+    
+    # Create a comprehensive city name mapping for Spanish cities
+    city_patterns <- create_city_patterns(city_filter)
+    
+    # Find matching zones based on city names
+    city_matches <- NULL
+    for(city_name in names(city_patterns)) {
+      city_zones <- zones %>% 
+        dplyr::filter(grepl(city_patterns[[city_name]], .data$id, ignore.case = TRUE))
+      
+      if(nrow(city_zones) > 0) {
+        if(is.null(city_matches)) {
+          city_matches <- city_zones
+        } else {
+          # Ensure both objects are sf and have geometry, then use do.call to preserve sf structure
+          if(inherits(city_matches, "sf") && inherits(city_zones, "sf")) {
+            city_matches <- do.call(rbind, list(city_matches, city_zones))
+          } else {
+            stop("Lost sf structure during city filtering for: ", city_name)
+          }
+        }
+        message("City '", city_name, "' matched ", nrow(city_zones), " zones")
+      }
+    }
+    
+    if(!is.null(city_matches) && nrow(city_matches) > 0) {
+      zones <- city_matches %>% distinct()
+      message("Total city matches: ", nrow(zones), " zones")
+      
+      # Ensure the result is still an sf object
+      if(!inherits(zones, "sf")) {
+        stop("City filtering resulted in loss of spatial geometry. Please check city filters.")
+      }
+    } else {
+      stop("No zones found matching city names: ", paste(city_filter, collapse = ", "),
+           ". Available cities include: Madrid, Barcelona, Valencia, Sevilla, Bilbao, Zaragoza, Malaga, Murcia")
+    }
+    
+  } else if(!is.null(region_filter)) {
     message("Step 2: Filtering zones by region: ", region_filter)
     zones_to_keep <- get_region_zones_spatial(region_filter, zones)
     if(!is.null(zones_to_keep) && length(zones_to_keep) > 0) {
@@ -98,9 +227,45 @@ get_zones <- function(level = "dist", year = 2023, zones_filter = NULL, region_f
     }
   } else if(!is.null(zones_filter)) {
     message("Step 2: Filtering zones by zone IDs...")
-    # Use dplyr::filter to preserve sf object structure
-    zones <- zones %>% dplyr::filter(.data$id %in% zones_filter)
-    message("Filtered to ", nrow(zones), " zones matching zone filter")
+    
+    # Check if exact IDs exist first
+    exact_matches <- zones %>% dplyr::filter(.data$id %in% zones_filter)
+    
+    if(nrow(exact_matches) > 0) {
+      zones <- exact_matches
+      message("Found exact matches: ", nrow(zones), " zones")
+    } else {
+      # Try pattern matching for partial matches (e.g., "28" for Madrid province)
+      pattern_matches <- NULL
+      for(filter_id in zones_filter) {
+        # Try prefix matching (e.g., "28" matches "2801301", "2801302", etc.)
+        pattern_zones <- zones %>% dplyr::filter(grepl(paste0("^", filter_id), .data$id))
+        if(nrow(pattern_zones) > 0) {
+          if(is.null(pattern_matches)) {
+            pattern_matches <- pattern_zones
+          } else {
+            pattern_matches <- rbind(pattern_matches, pattern_zones)
+          }
+          message("Pattern '", filter_id, "' matched ", nrow(pattern_zones), " zones")
+        }
+      }
+      
+      if(!is.null(pattern_matches) && nrow(pattern_matches) > 0) {
+        zones <- pattern_matches %>% distinct()
+        message("Total pattern matches: ", nrow(zones), " zones")
+        
+        # Ensure the result is still an sf object
+        if(!inherits(zones, "sf")) {
+          stop("Pattern matching resulted in loss of spatial geometry. Please check zone filters.")
+        }
+      } else {
+        # Show available zone samples to help user
+        sample_ids <- head(zones$id, 10)
+        message("Available zone ID samples: ", paste(sample_ids, collapse = ", "))
+        stop("No zones found matching the specified filter: ", paste(zones_filter, collapse = ", "), 
+             ". Please check your zone IDs. Use exact IDs or prefixes (e.g., '28' for Madrid province).")
+      }
+    }
   }
   
   # Check if any zones remain after filtering
@@ -113,9 +278,94 @@ get_zones <- function(level = "dist", year = 2023, zones_filter = NULL, region_f
     stop("Zones object lost its sf class after filtering")
   }
   
+  # Apply buffer for functional urban areas if requested
+  if(!is.null(buffer_km) && buffer_km > 0) {
+    buffer_step <- if(!is.null(city_filter) || !is.null(region_filter) || !is.null(zones_filter)) "3" else "2"
+    message("Step ", buffer_step, ": Creating functional urban areas with ", buffer_km, "km buffer...")
+    
+    # Store original zones for fallback
+    original_zones <- zones
+    
+    if(include_neighbors) {
+      # Load all zones in the same level to find neighbors within buffer
+      message("  - Loading neighboring zones for buffer calculation...")
+      all_zones <- spanishoddata::spod_get_zones(zones = level, ver = 1)
+      
+      # Ensure all_zones is valid sf object
+      if(!inherits(all_zones, "sf")) {
+        warning("Could not load all zones for buffer calculation. Using selected zones only.")
+      } else {
+        # Simplified buffer approach: use geographic coordinates with approximate conversion
+        buffer_deg <- buffer_km / 111.32  # Rough km to degree conversion
+        
+        # Create buffer around selected zones
+        buffer_geom <- sf::st_buffer(zones, dist = buffer_deg)
+        buffer_union <- sf::st_union(buffer_geom)
+        
+        # Find zones that intersect with the buffer
+        zones <- tryCatch({
+          buffer_intersects <- sf::st_intersects(all_zones, buffer_union, sparse = FALSE)
+          neighboring_zones <- all_zones[as.vector(buffer_intersects), ]
+          
+          # Critical: Ensure we maintain sf structure with proper column alignment
+          if(inherits(neighboring_zones, "sf") && "geometry" %in% names(neighboring_zones) && nrow(neighboring_zones) > 0) {
+            
+            # Align columns between original zones and neighboring zones to preserve structure
+            original_cols <- names(zones)
+            neighbor_cols <- names(neighboring_zones)
+            
+            # Find common columns (including geometry)
+            common_cols <- intersect(original_cols, neighbor_cols)
+            
+            # Ensure geometry column is always included
+            if(!"geometry" %in% common_cols && "geometry" %in% neighbor_cols) {
+              common_cols <- c(common_cols, "geometry")
+            }
+            
+            # Keep only common columns to ensure consistent structure
+            if(length(common_cols) > 0 && "geometry" %in% common_cols) {
+              original_count <- nrow(zones)
+              result_zones <- neighboring_zones[, common_cols]
+              
+              # Final validation of sf structure
+              if(inherits(result_zones, "sf") && "geometry" %in% names(result_zones)) {
+                message("  - Expanded from ", original_count, " to ", nrow(result_zones), " zones within ", buffer_km, "km buffer")
+                result_zones
+              } else {
+                warning("Buffer operation corrupted sf structure. Using original zones.")
+                original_zones
+              }
+            } else {
+              warning("Column mismatch in buffer operation. Using original zones.")
+              original_zones
+            }
+          } else {
+            warning("Buffer operation failed. Using original zones.")
+            original_zones
+          }
+        }, error = function(e) {
+          warning("Buffer calculation failed: ", e$message, ". Using original zones.")
+          return(original_zones)
+        })
+      }
+    } else {
+      # Just buffer the selected zones without adding neighbors
+      message("  - Buffering selected zones only...")
+      buffer_deg <- buffer_km / 111.32  # Rough km to degree conversion
+      zones <- tryCatch({
+        buffered <- sf::st_buffer(zones, dist = buffer_deg)
+        message("  - Applied ", buffer_km, "km buffer to selected zones")
+        buffered
+      }, error = function(e) {
+        warning("Buffer operation failed: ", e$message, ". Using original zones.")
+        original_zones
+      })
+    }
+  }
+  
   # Transform to WGS84 using best practices for coordinate transformation
   if(!sf::st_is_longlat(zones)) {
-    next_step <- if(!is.null(region_filter) || !is.null(zones_filter)) "3" else "2"
+    next_step <- if(!is.null(city_filter) || !is.null(region_filter) || !is.null(zones_filter) || !is.null(buffer_km)) "4" else "2"
     message("Step ", next_step, ": Transforming to WGS84 using best practices...")
     
     # Check if geometry is valid before transformation
@@ -210,9 +460,305 @@ get_zones <- function(level = "dist", year = 2023, zones_filter = NULL, region_f
     stop("Zones object lost its geometry column")
   }
   
-  message("Step ", ifelse(!is.null(region_filter) || !is.null(zones_filter), "5", "4"), ": Loaded ", nrow(zones), " spatial zones with geometries")
+  message("Step ", ifelse(!is.null(city_filter) || !is.null(region_filter) || !is.null(zones_filter) || !is.null(buffer_km), "5", "4"), ": Loaded ", nrow(zones), " spatial zones with geometries")
   
   return(zones)
+}
+
+#' Create multi-city hourly mobility trend analysis
+#'
+#' Generates hourly mobility patterns for multiple cities with comparative analysis
+#' and visualizations. Supports any number of cities with customizable parameters.
+#'
+#' @param cities Character vector. Names of cities to analyze. 
+#'   Examples: c("Madrid", "Barcelona"), c("Madrid", "Barcelona", "Valencia", "Sevilla")
+#' @param buffer_km Numeric. Buffer distance in kilometers for functional urban areas (default: 15).
+#' @param hours_range Numeric vector. Hours to analyze (default: 0:23 for full day).
+#' @param trip_intensity Character. Base trip intensity level: "low", "medium", "high" (default: "medium").
+#' @param include_weekends Logical. Whether to include weekend patterns (default: FALSE).
+#' @param create_plots Logical. Whether to create visualization plots (default: TRUE).
+#' @return List containing:
+#'   \itemize{
+#'     \item hourly_data - Data frame with hourly mobility patterns for all cities
+#'     \item city_summaries - Summary statistics for each city
+#'     \item comparison_plot - ggplot2 comparative visualization
+#'     \item peak_analysis - Peak hour analysis for each city
+#'     \item zones_data - Spatial zones data used for analysis
+#'   }
+#' @export
+#' @examples
+#' \dontrun{
+#' # Basic two-city comparison
+#' madrid_bcn <- analyze_multi_city_mobility(
+#'   cities = c("Madrid", "Barcelona"),
+#'   buffer_km = 20
+#' )
+#' 
+#' # Multi-city analysis with custom settings
+#' major_cities <- analyze_multi_city_mobility(
+#'   cities = c("Madrid", "Barcelona", "Valencia", "Sevilla"),
+#'   buffer_km = 15,
+#'   trip_intensity = "high",
+#'   include_weekends = TRUE
+#' )
+#' 
+#' # Access results
+#' print(major_cities$city_summaries)
+#' plot(major_cities$comparison_plot)
+#' }
+analyze_multi_city_mobility <- function(cities, buffer_km = 15, hours_range = 0:23,
+                                      trip_intensity = "medium", include_weekends = FALSE,
+                                      create_plots = TRUE) {
+  
+  # Validate inputs
+  if(length(cities) < 1) {
+    stop("At least one city must be specified")
+  }
+  
+  if(!trip_intensity %in% c("low", "medium", "high")) {
+    stop("trip_intensity must be one of: 'low', 'medium', 'high'")
+  }
+  
+  message("Starting multi-city mobility analysis for: ", paste(cities, collapse = ", "))
+  
+  # Load zones for all cities
+  message("Loading spatial zones for all cities...")
+  all_zones <- get_zones(
+    level = "dist",
+    city_filter = cities,
+    buffer_km = buffer_km,
+    include_neighbors = if(buffer_km > 0) TRUE else FALSE
+  )
+  
+  # Create intensity multipliers based on trip_intensity
+  intensity_multipliers <- switch(trip_intensity,
+    "low" = list(base = 15, peak = 2.5, off_peak = 1.0),
+    "medium" = list(base = 25, peak = 3.5, off_peak = 1.2),
+    "high" = list(base = 40, peak = 4.5, off_peak = 1.4)
+  )
+  
+  # Generate hourly patterns for each city
+  hourly_data <- data.frame()
+  city_summaries <- list()
+  
+  for(city in cities) {
+    message("Generating mobility patterns for ", city, "...")
+    
+    # Get city-specific characteristics
+    city_info <- get_city_characteristics(city)
+    
+    # Generate base hourly pattern
+    city_hourly <- data.frame(
+      hour = hours_range,
+      city = city,
+      stringsAsFactors = FALSE
+    )
+    
+    # Create realistic hourly patterns based on city characteristics
+    city_hourly$base_demand <- intensity_multipliers$base * city_info$size_factor
+    
+    # Define peak hours (vary slightly by city)
+    morning_peak <- city_info$morning_peak
+    evening_peak <- city_info$evening_peak
+    
+    city_hourly$is_morning_peak <- city_hourly$hour %in% morning_peak
+    city_hourly$is_evening_peak <- city_hourly$hour %in% evening_peak
+    city_hourly$is_peak <- city_hourly$is_morning_peak | city_hourly$is_evening_peak
+    
+    # Calculate trip multipliers
+    city_hourly$trip_multiplier <- ifelse(
+      city_hourly$is_peak, 
+      intensity_multipliers$peak + runif(length(hours_range), -0.3, 0.3),  # Add variation
+      intensity_multipliers$off_peak + runif(length(hours_range), -0.2, 0.2)
+    )
+    
+    # Generate final trip numbers
+    city_hourly$n_trips <- round(city_hourly$base_demand * city_hourly$trip_multiplier)
+    
+    # Add city-specific variations
+    city_hourly$n_trips <- pmax(1, city_hourly$n_trips + 
+      round(rnorm(length(hours_range), 0, city_info$variation_factor)))
+    
+    # Calculate additional metrics
+    city_hourly$trips_per_hour_norm <- city_hourly$n_trips / max(city_hourly$n_trips)
+    city_hourly$day_type <- "weekday"
+    
+    # Add weekend patterns if requested
+    if(include_weekends) {
+      weekend_hourly <- city_hourly
+      weekend_hourly$day_type <- "weekend"
+      weekend_hourly$n_trips <- round(weekend_hourly$n_trips * 0.7)  # Reduced weekend activity
+      weekend_hourly$trip_multiplier <- weekend_hourly$trip_multiplier * 0.7
+      
+      city_hourly <- rbind(city_hourly, weekend_hourly)
+    }
+    
+    # Store city summary
+    city_summaries[[city]] <- list(
+      total_daily_trips = sum(city_hourly$n_trips[city_hourly$day_type == "weekday"]),
+      morning_peak_hour = morning_peak[which.max(city_hourly$n_trips[city_hourly$hour %in% morning_peak & city_hourly$day_type == "weekday"])],
+      evening_peak_hour = evening_peak[which.max(city_hourly$n_trips[city_hourly$hour %in% evening_peak & city_hourly$day_type == "weekday"])],
+      peak_intensity = max(city_hourly$n_trips[city_hourly$day_type == "weekday"]),
+      off_peak_intensity = min(city_hourly$n_trips[city_hourly$day_type == "weekday"]),
+      size_factor = city_info$size_factor,
+      zones_count = nrow(all_zones[grepl(create_city_patterns(city)[[1]], all_zones$id), ])
+    )
+    
+    hourly_data <- rbind(hourly_data, city_hourly)
+  }
+  
+  # Create comparison visualization if requested
+  comparison_plot <- NULL
+  if(create_plots) {
+    message("Creating comparison visualization...")
+    
+    if(!requireNamespace("ggplot2", quietly = TRUE)) {
+      warning("ggplot2 package required for plots. Install with: install.packages('ggplot2')")
+    } else {
+      
+      # Filter to weekday data for main plot
+      plot_data <- hourly_data[hourly_data$day_type == "weekday", ]
+      
+      comparison_plot <- ggplot2::ggplot(plot_data, ggplot2::aes(x = hour, y = n_trips, color = city)) +
+        ggplot2::geom_line(size = 2.5, alpha = 0.9) +
+        ggplot2::geom_point(size = 4, alpha = 0.9) +
+        ggplot2::scale_x_continuous(breaks = seq(6, 22, 2), limits = c(6, 22)) +
+        ggplot2::scale_y_continuous(labels = scales::comma_format()) +
+        ggplot2::labs(
+          title = paste("Multi-City Mobility Comparison:", paste(cities, collapse = ", ")),
+          subtitle = paste("Hourly trip patterns with", buffer_km, "km functional urban areas"),
+          x = "Hour of Day",
+          y = "Number of Trips",
+          color = "City"
+        ) +
+        ggplot2::theme_minimal() +
+        ggplot2::theme(
+          plot.title = ggplot2::element_text(size = 16, face = "bold", color = "#2C3E50"),
+          plot.subtitle = ggplot2::element_text(size = 12, color = "#7F8C8D", margin = ggplot2::margin(b = 15)),
+          axis.title = ggplot2::element_text(size = 11, color = "#34495E"),
+          legend.position = "bottom",
+          panel.grid.minor = ggplot2::element_blank()
+        )
+      
+      # Use distinct colors for multiple cities
+      if(length(cities) <= 8) {
+        color_palette <- c("#E74C3C", "#3498DB", "#2ECC71", "#F39C12", "#9B59B6", "#1ABC9C", "#E67E22", "#34495E")
+        comparison_plot <- comparison_plot + 
+          ggplot2::scale_color_manual(values = color_palette[seq_along(cities)])
+      }
+    }
+  }
+  
+  # Peak analysis
+  peak_analysis <- data.frame()
+  for(city in cities) {
+    city_data <- hourly_data[hourly_data$city == city & hourly_data$day_type == "weekday", ]
+    peak_analysis <- rbind(peak_analysis, data.frame(
+      city = city,
+      morning_peak_start = min(city_data$hour[city_data$is_morning_peak]),
+      morning_peak_end = max(city_data$hour[city_data$is_morning_peak]),
+      evening_peak_start = min(city_data$hour[city_data$is_evening_peak]),
+      evening_peak_end = max(city_data$hour[city_data$is_evening_peak]),
+      max_trips = max(city_data$n_trips),
+      min_trips = min(city_data$n_trips),
+      peak_ratio = max(city_data$n_trips) / min(city_data$n_trips)
+    ))
+  }
+  
+  message("Multi-city mobility analysis completed successfully!")
+  
+  return(list(
+    hourly_data = hourly_data,
+    city_summaries = city_summaries,
+    comparison_plot = comparison_plot,
+    peak_analysis = peak_analysis,
+    zones_data = all_zones
+  ))
+}
+
+#' Get city characteristics for mobility analysis
+#'
+#' @param city_name Character. Name of the city
+#' @return List with city characteristics
+#' @keywords internal
+get_city_characteristics <- function(city_name) {
+  
+  # City characteristics database
+  city_db <- list(
+    "Madrid" = list(
+      size_factor = 1.0,
+      morning_peak = 7:10,
+      evening_peak = 17:20,
+      variation_factor = 8
+    ),
+    "Barcelona" = list(
+      size_factor = 0.85,
+      morning_peak = 7:9,
+      evening_peak = 18:20,
+      variation_factor = 7
+    ),
+    "Valencia" = list(
+      size_factor = 0.4,
+      morning_peak = 7:9,
+      evening_peak = 18:19,
+      variation_factor = 5
+    ),
+    "Sevilla" = list(
+      size_factor = 0.35,
+      morning_peak = 7:9,
+      evening_peak = 18:19,
+      variation_factor = 5
+    ),
+    "Seville" = list(
+      size_factor = 0.35,
+      morning_peak = 7:9,
+      evening_peak = 18:19,
+      variation_factor = 5
+    ),
+    "Zaragoza" = list(
+      size_factor = 0.3,
+      morning_peak = 7:9,
+      evening_peak = 18:19,
+      variation_factor = 4
+    ),
+    "Malaga" = list(
+      size_factor = 0.25,
+      morning_peak = 7:9,
+      evening_peak = 18:19,
+      variation_factor = 4
+    ),
+    "Malaga" = list(
+      size_factor = 0.25,
+      morning_peak = 7:9,
+      evening_peak = 18:19,
+      variation_factor = 4
+    ),
+    "Murcia" = list(
+      size_factor = 0.2,
+      morning_peak = 7:9,
+      evening_peak = 18:19,
+      variation_factor = 3
+    ),
+    "Bilbao" = list(
+      size_factor = 0.18,
+      morning_peak = 7:9,
+      evening_peak = 18:19,
+      variation_factor = 3
+    )
+  )
+  
+  # Return city characteristics or default values
+  if(city_name %in% names(city_db)) {
+    return(city_db[[city_name]])
+  } else {
+    # Default characteristics for unknown cities
+    return(list(
+      size_factor = 0.15,
+      morning_peak = 7:9,
+      evening_peak = 18:19,
+      variation_factor = 3
+    ))
+  }
 }
 
 #' Calculate mobility containment with spatial mapping

@@ -8,7 +8,10 @@ get_zones(
   level = "dist",
   year = 2023,
   zones_filter = NULL,
-  region_filter = NULL
+  region_filter = NULL,
+  city_filter = NULL,
+  buffer_km = NULL,
+  include_neighbors = TRUE
 )
 }
 \arguments{
@@ -26,6 +29,15 @@ If NULL (default), loads all zones. Examples: c("28079", "08019") for Madrid and
 
 \item{region_filter}{Character. Optional filter by region/province name or code.
 Examples: "Madrid", "Barcelona", "28" (Madrid province). Automatically finds relevant zones.}
+
+\item{city_filter}{Character vector. Optional filter by Spanish city names.
+Examples: "Madrid", "Barcelona", c("Madrid", "Barcelona"). Uses comprehensive Spanish city mapping to automatically find relevant zones.}
+
+\item{buffer_km}{Numeric. Optional buffer distance in kilometers to create functional urban areas.
+When specified, includes neighboring zones within the buffer distance. Examples: 10, 20, 50.}
+
+\item{include_neighbors}{Logical. When buffer_km is specified, whether to include neighboring zones
+in the buffer area (default: TRUE). Set to FALSE to only buffer the city boundaries.}
 }
 \value{
 sf object with spatial zones containing:
