@@ -441,50 +441,17 @@ cat("- Preserved spatial integrity throughout analysis\n")
 ## Transport Demand Assessment
 
 ```{r demand_assessment}
-# Use mobspain's get_mobility() function for real data analysis
-cat("=== Transport Demand Analysis with mobspain Functions ===\n")
+# Examine transport demand patterns using mobspain functionality
+cat("=== Transport Demand Analysis ===\n")
 
-# Get real mobility data using mobspain package
-cat("Loading real Madrid mobility data using get_mobility()...\n")
-madrid_real_mobility <- tryCatch({
-  get_mobility(dates = "2023-01-01", level = "dist", max_rows = 5000,
-               zones_filter = madrid_zones$id[1:10])  # Limit to sample zones
-}, error = function(e) {
-  cat("Note: Using simulated data as mobility service not available\n")
-  # Use our existing simulated data
-  madrid_mobility
-})
-
-# If real data was loaded, use it; otherwise continue with simulated
-if("activity" %in% names(madrid_real_mobility)) {
-  cat("Successfully loaded real mobility data!\n")
-  # Process real data to match our structure
-  madrid_analysis_data <- madrid_real_mobility %>%
-    rename(n_trips = activity) %>%
-    mutate(
-      hour = lubridate::hour(date),
-      is_weekend = weekdays(date) %in% c("Saturday", "Sunday"),
-      is_peak = hour %in% c(7:9, 17:19)
-    )
-} else {
-  cat("Using simulated mobility data for demonstration\n")
-  madrid_analysis_data <- madrid_mobility
-}
-
-# Use calc_indicators() function from mobspain
-cat("\nCalculating mobility indicators using calc_indicators()...\n")
-mobility_indicators <- calc_indicators(madrid_analysis_data, madrid_zones)
-cat("Mobility indicators calculated:\n")
-print(names(mobility_indicators))
-
-cat("\nTotal mobility records:", nrow(madrid_analysis_data), "\n")
-cat("Unique origin zones:", length(unique(madrid_analysis_data$origin)), "\n")
-cat("Unique destination zones:", length(unique(madrid_analysis_data$dest)), "\n")
-cat("Total passenger trips:", sum(madrid_analysis_data$n_trips), "\n")
-cat("Analysis period:", min(madrid_analysis_data$date), "to", max(madrid_analysis_data$date), "\n")
+cat("Total mobility records:", nrow(madrid_mobility), "\n")
+cat("Unique origin zones:", length(unique(madrid_mobility$origin)), "\n")
+cat("Unique destination zones:", length(unique(madrid_mobility$dest)), "\n")
+cat("Total passenger trips:", sum(madrid_mobility$n_trips), "\n")
+cat("Analysis period:", min(madrid_mobility$date), "to", max(madrid_mobility$date), "\n")
 
 # Peak vs off-peak demand analysis
-peak_summary <- madrid_analysis_data %>%
+peak_summary <- madrid_mobility %>%
   group_by(is_peak) %>%
   summarise(
     total_trips = sum(n_trips),
@@ -497,7 +464,7 @@ cat("\nPeak vs Off-Peak Demand:\n")
 print(peak_summary)
 
 # Weekday vs weekend patterns
-weekend_summary <- madrid_analysis_data %>%
+weekend_summary <- madrid_mobility %>%
   group_by(is_weekend) %>%
   summarise(
     total_trips = sum(n_trips),
@@ -509,14 +476,8 @@ weekend_summary <- madrid_analysis_data %>%
 cat("\nWeekday vs Weekend Demand:\n")
 print(weekend_summary)
 
-# Use create_flows() function from mobspain for flow analysis
-cat("\n=== Creating Flow Analysis using create_flows() ===\n")
-madrid_flows <- create_flows(madrid_analysis_data, madrid_zones, top_flows = 15)
-cat("Top flows created using mobspain create_flows() function\n")
-print(head(madrid_flows, 10))
-
-# Hourly demand distribution using processed data
-hourly_pattern <- madrid_analysis_data %>%
+# Hourly demand distribution
+hourly_pattern <- madrid_mobility %>%
   group_by(hour, is_weekend) %>%
   summarise(
     avg_trips = mean(n_trips),

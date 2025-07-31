@@ -1,22 +1,15 @@
 Package: mobspain
-Title: Spatial Mobility Analysis for Spanish Transportation Data
+Title: Spanish Transport Zone Analysis
 Version: 1.0.0
 Authors@R: 
     person("Prince", "Oppong Boakye", email = "prynx44@gmail.com", role = c("aut", "cre"))
 Author: Prince Oppong Boakye [aut, cre]
 Maintainer: Prince Oppong Boakye <prynx44@gmail.com>
-Description: A comprehensive toolkit for spatial analysis of Spanish mobility patterns 
-    using MITMA (Ministry of Transport, Mobility and Urban Agenda) data. Provides 
-    streamlined functions for data access, spatial analysis, and automatic map 
-    generation with clear step-by-step messaging and memory-efficient processing. 
-    All analysis functions automatically create spatial maps when geometries are 
-    provided using sf package integration. Features include mobility data retrieval 
-    with advanced filtering capabilities (by region, province, or specific zones), 
-    spatial containment analysis, anomaly detection, machine learning prediction, 
-    and interactive spatial visualizations. The package includes S3 classes for 
-    structured analysis results with custom print and summary methods. A comprehensive 
-    data analysis vignette demonstrates spatial mobility analysis with real Spanish 
-    transportation data.
+Description: A minimal R package for accessing Spanish administrative zones
+    for transport analysis. Provides easy access to spatial zone geometries
+    with filtering capabilities for cities, regions, and specific zones.
+    Designed to work seamlessly with the comprehensive transport analysis
+    demonstrated in the package vignette.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
@@ -24,22 +17,16 @@ Imports:
     spanishoddata,
     sf,
     dplyr,
-    ggplot2,
-    glue,
-    lubridate,
-    rlang,
-    stats,
-    methods,
-    scales,
-    digest,
-    purrr,
-    tidyr
+    rlang
 Suggests: 
     testthat (>= 3.0.0),
     rmarkdown,
     knitr,
-    randomForest,
-    duckdb
+    ggplot2,
+    viridis,
+    zoo,
+    tidyr,
+    scales
 VignetteBuilder: knitr
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
