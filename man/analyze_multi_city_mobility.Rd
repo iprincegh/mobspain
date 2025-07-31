@@ -2,89 +2,63 @@
 % Please edit documentation in R/spatial.R
 \name{analyze_multi_city_mobility}
 \alias{analyze_multi_city_mobility}
-\title{Multi-City Mobility Analysis}
+\title{Create multi-city hourly mobility trend analysis}
 \usage{
-analyze_multi_city_mobility(cities, buffer_km = 15, hours_range = 0:23,
-                           trip_intensity = "medium", include_weekends = FALSE,
-                           create_plots = TRUE)
+analyze_multi_city_mobility(
+  cities,
+  buffer_km = 15,
+  hours_range = 0:23,
+  trip_intensity = "medium",
+  include_weekends = FALSE,
+  create_plots = TRUE
+)
 }
 \arguments{
-\item{cities}{Character vector. Spanish city names for comparative analysis.
-Examples: c("Madrid", "Barcelona"), c("Madrid", "Barcelona", "Valencia").}
+\item{cities}{Character vector. Names of cities to analyze.
+Examples: c("Madrid", "Barcelona"), c("Madrid", "Barcelona", "Valencia", "Sevilla")}
 
-\item{buffer_km}{Numeric. Buffer distance in kilometers around cities for 
-functional urban area analysis (default: 15).}
+\item{buffer_km}{Numeric. Buffer distance in kilometers for functional urban areas (default: 15).}
 
-\item{hours_range}{Numeric vector. Hours to include in mobility analysis 
-(default: 0:23 for full day).}
+\item{hours_range}{Numeric vector. Hours to analyze (default: 0:23 for full day).}
 
-\item{trip_intensity}{Character. Intensity level for simulated mobility patterns.
-Options: "low", "medium" (default), "high".}
+\item{trip_intensity}{Character. Base trip intensity level: "low", "medium", "high" (default: "medium").}
 
-\item{include_weekends}{Logical. Whether to include weekend patterns in the
-analysis (default: FALSE).}
+\item{include_weekends}{Logical. Whether to include weekend patterns (default: FALSE).}
 
-\item{create_plots}{Logical. Whether to generate comparative plots 
-(default: TRUE).}
+\item{create_plots}{Logical. Whether to create visualization plots (default: TRUE).}
 }
 \value{
 List containing:
 \itemize{
-\item cities_data - List of spatial zones for each city
-\item mobility_patterns - Data frame with hourly mobility trends by city
-\item summary_stats - Summary statistics for each city
-\item comparative_metrics - Cross-city comparison metrics
+\item hourly_data - Data frame with hourly mobility patterns for all cities
+\item city_summaries - Summary statistics for each city
+\item comparison_plot - ggplot2 comparative visualization
+\item peak_analysis - Peak hour analysis for each city
+\item zones_data - Spatial zones data used for analysis
 }
 }
 \description{
-Performs comparative mobility analysis across multiple Spanish cities.
-This function loads spatial zones for specified cities and generates
-comparative mobility patterns and statistics. Useful for urban planning,
-transportation research, and policy analysis.
-}
-\details{
-The function automatically handles:
-\itemize{
-\item City name mapping to administrative zones
-\item Spatial data loading and validation
-\item Mobility pattern generation (simulated if no date range provided)
-\item Cross-city statistical comparison
-\item Robust error handling for missing cities
-}
-
-Supported cities include major Spanish metropolitan areas with comprehensive
-zone coverage. The function provides both individual city analysis and
-comparative metrics across cities.
+Generates hourly mobility patterns for multiple cities with comparative analysis
+and visualizations. Supports any number of cities with customizable parameters.
 }
 \examples{
 \dontrun{
-# Compare mobility patterns across major Spanish cities
-analysis <- analyze_multi_city_mobility(
-  cities = c("Madrid", "Barcelona", "Valencia"),
-  level = "dist"
+# Basic two-city comparison
+madrid_bcn <- analyze_multi_city_mobility(
+  cities = c("Madrid", "Barcelona"),
+  buffer_km = 20
+)
+
+# Multi-city analysis with custom settings
+major_cities <- analyze_multi_city_mobility(
+  cities = c("Madrid", "Barcelona", "Valencia", "Sevilla"),
+  buffer_km = 15,
+  trip_intensity = "high",
+  include_weekends = TRUE
 )
 
 # Access results
-madrid_zones <- analysis$cities_data$Madrid
-mobility_trends <- analysis$mobility_patterns
-city_stats <- analysis$summary_stats
-
-# Two-city comparison
-comparison <- analyze_multi_city_mobility(
-  cities = c("Madrid", "Barcelona"),
-  verbose = TRUE
-)
+print(major_cities$city_summaries)
+plot(major_cities$comparison_plot)
 }
-
-# Basic usage with error handling
-tryCatch({
-  result <- analyze_multi_city_mobility(cities = "Madrid")
-  print(paste("Analysis completed for", length(result$cities_data), "cities"))
-}, error = function(e) {
-  message("Analysis failed: ", e$message)
-})
-}
-\seealso{
-\code{\link{get_zones}} for individual city zone loading,
-\code{\link{analyze_spatial}} for single-city spatial analysis
 }

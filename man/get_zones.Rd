@@ -2,7 +2,7 @@
 % Please edit documentation in R/spatial.R
 \name{get_zones}
 \alias{get_zones}
-\title{Core Spatial Analysis Functions for Spatial Analysis}
+\title{Get spatial zones with geometries}
 \usage{
 get_zones(
   level = "dist",
@@ -25,19 +25,24 @@ get_zones(
 \item{year}{Numeric. Year for the boundaries (default: 2023). Available years depend on data source.}
 
 \item{zones_filter}{Character vector. Optional filter for specific zone IDs.
-If NULL (default), loads all zones. Examples: c("28079", "08019") for Madrid and Barcelona.}
+If NULL (default), loads all zones. Examples:
+\itemize{
+\item c("2801301", "08251") for specific districts
+\item c("28", "08") for all zones in Madrid/Barcelona provinces (prefix matching)
+\item c("28079", "08019") will use prefix matching to find Madrid/Barcelona zones
+}}
 
 \item{region_filter}{Character. Optional filter by region/province name or code.
 Examples: "Madrid", "Barcelona", "28" (Madrid province). Automatically finds relevant zones.}
 
-\item{city_filter}{Character vector. Optional filter by Spanish city names.
-Examples: "Madrid", "Barcelona", c("Madrid", "Barcelona"). Uses comprehensive Spanish city mapping to automatically find relevant zones.}
+\item{city_filter}{Character vector. Optional filter by city names.
+Examples: c("Madrid", "Barcelona", "Valencia", "Sevilla"). Case-insensitive matching.}
 
-\item{buffer_km}{Numeric. Optional buffer distance in kilometers to create functional urban areas.
-When specified, includes neighboring zones within the buffer distance. Examples: 10, 20, 50.}
+\item{buffer_km}{Numeric. Optional buffer distance in kilometers around selected zones
+to create functional urban areas. Default is NULL (no buffer). Examples: 15, 20, 30.}
 
-\item{include_neighbors}{Logical. When buffer_km is specified, whether to include neighboring zones
-in the buffer area (default: TRUE). Set to FALSE to only buffer the city boundaries.}
+\item{include_neighbors}{Logical. If TRUE and buffer_km is specified, includes
+neighboring zones within the buffer distance (default: TRUE).}
 }
 \value{
 sf object with spatial zones containing:
@@ -49,16 +54,11 @@ sf object with spatial zones containing:
 }
 }
 \description{
-This file contains the essential spatial analysis functions designed for
-users learning spatial data science.
-All functions automatically create spatial maps when possible.
-Get spatial zones with geometries
-}
-\details{
 Retrieves spatial zones (administrative boundaries) with geometries for mapping.
 Simplified for user convenience with automatic CRS handling and basic spatial statistics.
 Includes filtering options to load subsets of zones.
-
+}
+\details{
 This function automatically:
 \itemize{
 \item Downloads spatial boundaries from Spanish government sources
@@ -75,7 +75,20 @@ zones <- get_zones(level = "dist")
 # Get specific zones only (reduces memory usage)
 madrid_barcelona <- get_zones(
   level = "dist", 
-  zones_filter = c("28079", "08019")  # Madrid and Barcelona
+  zones_filter = c("28", "08")  # Madrid and Barcelona provinces (prefix matching)
+)
+
+# Get zones by city names with functional urban area buffer
+madrid_valencia <- get_zones(
+  level = "dist",
+  city_filter = c("Madrid", "Valencia"),
+  buffer_km = 20  # 20km functional urban area
+)
+
+# Get multiple cities without buffer
+major_cities <- get_zones(
+  level = "dist",
+  city_filter = c("Madrid", "Barcelona", "Valencia", "Sevilla")
 )
 
 # Get zones for a specific region

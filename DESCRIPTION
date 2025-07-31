@@ -31,7 +31,9 @@ Imports:
     stats,
     methods,
     scales,
-    digest
+    digest,
+    purrr,
+    tidyr
 Suggests: 
     testthat (>= 3.0.0),
     rmarkdown,

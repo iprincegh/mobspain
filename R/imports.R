@@ -9,6 +9,8 @@
 #' @importFrom methods is
 #' @importFrom scales percent
 #' @importFrom digest digest
+#' @importFrom purrr map
+#' @importFrom tidyr pivot_longer
 NULL
 
 # Declare global variables to avoid R CMD check warnings
