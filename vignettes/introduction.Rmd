@@ -40,14 +40,16 @@ library(dplyr)
 library(sf)
 library(ggplot2)
 library(viridis)
+library(zoo)
+library(tidyr)
 ```
 
-## Enhanced Data Loading Capabilities
+## Data Loading Capabilities
 
 The enhanced `mobspain` package provides improved data access through city name filtering, eliminating the need for manual zone code lookup.
 
 ```{r data_loading}
-# Enhanced city filtering - Madrid example
+# City filtering - Madrid example
 madrid_zones <- get_zones(level = "dist", city_filter = "Madrid")
 
 cat("Madrid zones loaded:", nrow(madrid_zones), "zones\n")
@@ -84,9 +86,91 @@ zone_summary <- madrid_analysis %>%
 print(zone_summary)
 ```
 
+## Zone Size Distribution Analysis
+
+```{r zone_distribution}
+# Create zone size categories
+madrid_categorized <- madrid_zones %>%
+  mutate(
+    area_km2 = as.numeric(st_area(.)) / 1000000,
+    size_category = cut(area_km2, 
+                       breaks = quantile(area_km2, c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE),
+                       labels = c("Small", "Medium", "Large", "Very Large"),
+                       include.lowest = TRUE)
+  )
+
+# Distribution analysis
+size_distribution <- madrid_categorized %>%
+  st_drop_geometry() %>%
+  group_by(size_category) %>%
+  summarise(
+    count = n(),
+    total_area = round(sum(area_km2, na.rm = TRUE), 1),
+    avg_area = round(mean(area_km2, na.rm = TRUE), 3),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    percentage = round(count / sum(count) * 100, 1),
+    area_percentage = round(total_area / sum(total_area) * 100, 1)
+  )
+
+print(size_distribution)
+```
+
+## Spatial Distribution Visualization
+
+```{r spatial_visualization}
+# Create spatial map
+madrid_map <- ggplot(madrid_categorized) +
+  geom_sf(aes(fill = size_category), color = "white", size = 0.1) +
+  scale_fill_viridis_d(name = "Zone Size\nCategory", option = "plasma") +
+  theme_void() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    legend.position = "right",
+    legend.text = element_text(size = 9),
+    legend.title = element_text(size = 10, face = "bold")
+  ) +
+  labs(
+    title = "Madrid Administrative Zones by Size Category",
+    subtitle = paste("Total zones:", nrow(madrid_zones), "| District level analysis"),
+    caption = "Data: mobspain package | City filtering capability"
+  )
+
+print(madrid_map)
+```
+
+## Size Category Distribution
+
+```{r distribution_plot}
+# Zone count distribution
+distribution_plot <- ggplot(size_distribution, aes(x = size_category, y = count)) +
+  geom_col(fill = "#2E8B57", alpha = 0.8, width = 0.7) +
+  geom_text(aes(label = paste0(count, "\n(", percentage, "%)")), 
+            vjust = -0.5, size = 3.5, fontface = "bold") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.title = element_text(size = 10, face = "bold"),
+    axis.text = element_text(size = 9),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  labs(
+    title = "Distribution of Madrid Zones by Size Category",
+    x = "Zone Size Category",
+    y = "Number of Zones",
+    caption = "Quartile-based size categorization"
+  ) +
+  ylim(0, max(size_distribution$count) * 1.2)
+
+print(distribution_plot)
+```
+
 # Analysis Results
 
-## Enhanced Data Loading and Multi-City Capabilities
+## Data Loading and Multi-City Capabilities
 
 ```{r multi_city_analysis}
 # Generate Madrid mobility data first for use throughout analysis
@@ -109,10 +193,10 @@ madrid_mobility <- expand.grid(
     n_trips = round(base_demand * peak_multiplier * weekend_adjustment)
   )
 
-# Demonstrate multi-city analysis capabilities using enhanced get_zones function
+# Demonstrate multi-city analysis capabilities using get_zones function
 cat("=== Multi-City Comparison Analysis ===\n")
 
-# Safely load additional Spanish cities using enhanced city filtering
+# Safely load additional Spanish cities using city filtering
 barcelona_zones <- tryCatch({
   get_zones(level = "dist", city_filter = "Barcelona")
 }, error = function(e) {
@@ -190,7 +274,7 @@ city_comparison_plot <- ggplot(city_comparison_long, aes(x = city, y = value, fi
   labs(title = "Spanish Cities Comparative Analysis",
        subtitle = "Administrative zone characteristics across major Spanish metropolitan areas",
        x = "City", y = "Value",
-       caption = "Enhanced mobspain package enables direct city name filtering") +
+       caption = "mobspain package enables direct city name filtering") +
   theme_minimal() +
   theme(
     plot.title = element_text(size = 16, face = "bold", hjust = 0.5, color = "#2C3E50"),
@@ -262,33 +346,64 @@ multi_city_hourly <- multi_city_mobility %>%
     .groups = "drop"
   )
 
-# Create comprehensive three-city hourly comparison
-multi_city_plot <- ggplot(multi_city_hourly, aes(x = hour, y = avg_trips, color = city)) +
-  geom_line(size = 2.2, alpha = 0.9) +
-  geom_point(size = 3.5, alpha = 0.9) +
+# Create minimal three-city hourly comparison
+multi_city_enhanced <- multi_city_hourly %>%
+  group_by(city, is_weekend) %>%
+  mutate(
+    demand_intensity = case_when(
+      avg_trips >= quantile(avg_trips, 0.8, na.rm = TRUE) ~ "High",
+      avg_trips >= quantile(avg_trips, 0.4, na.rm = TRUE) ~ "Medium",
+      TRUE ~ "Low"
+    )
+  ) %>%
+  ungroup()
+
+multi_city_plot <- ggplot(multi_city_enhanced, aes(x = hour, y = avg_trips, color = city)) +
+  # Subtle trend smoothing
+  geom_smooth(method = "loess", span = 0.4, se = FALSE, size = 0.5, alpha = 0.6) +
+  # Clean, thin lines
+  geom_line(size = 0.8, alpha = 0.9) +
+  # Small, minimal points
+  geom_point(size = 1.2, alpha = 0.8, stroke = 0) +
   facet_wrap(~ifelse(is_weekend, "Weekend", "Weekday"), ncol = 2, scales = "free_y") +
-  scale_color_manual(values = c("Madrid" = "#E74C3C", "Barcelona" = "#3498DB", "Valencia" = "#27AE60"),
+  # Minimal color palette
+  scale_color_manual(values = c("Madrid" = "#e74c3c", "Barcelona" = "#3498db", "Valencia" = "#27ae60"),
                      name = "City") +
-  scale_x_continuous(breaks = seq(6, 22, 4)) +
-  scale_y_continuous(labels = scales::comma_format()) +
-  labs(title = "Multi-City Hourly Transport Demand Comparison",
-       subtitle = "Distinct mobility patterns across Spain's major metropolitan areas",
+  scale_x_continuous(breaks = seq(6, 22, 4), labels = function(x) paste0(x, ":00")) +
+  scale_y_continuous(labels = scales::comma_format(accuracy = 1)) +
+  labs(title = "Multi-City Transport Demand Patterns",
+       subtitle = "Comparing Madrid, Barcelona, and Valencia mobility patterns",
        x = "Hour of Day", y = "Average Trips per Route",
-       caption = "Comparing Madrid (capital), Barcelona (tourism/business), Valencia (regional center)") +
+       caption = "mobspain package analysis") +
   theme_minimal() +
   theme(
+    # Clean typography
+    plot.title = element_text(size = 14, face = "bold", color = "#2c3e50", hjust = 0.5, margin = margin(b = 5)),
+    plot.subtitle = element_text(size = 11, color = "#7f8c8d", hjust = 0.5, margin = margin(b = 20)),
+    axis.title = element_text(size = 10, color = "#34495e"),
+    axis.text = element_text(size = 9, color = "#7f8c8d"),
+    # Minimal legend
     legend.position = "top",
-    plot.title = element_text(size = 16, face = "bold", color = "#2C3E50"),
-    plot.subtitle = element_text(size = 12, color = "#7F8C8D", margin = margin(b = 15)),
-    axis.title = element_text(size = 11, color = "#34495E"),
-    axis.text = element_text(size = 10, color = "#5D6D7E"),
-    legend.text = element_text(size = 11),
-    legend.title = element_text(size = 11, face = "bold"),
-    strip.text = element_text(size = 11, face = "bold"),
-    plot.caption = element_text(size = 9, color = "#95A5A6", margin = margin(t = 10)),
+    legend.title = element_blank(),
+    legend.text = element_text(size = 9, color = "#34495e"),
+    legend.margin = margin(b = 10),
+    legend.key.width = unit(20, "pt"),
+    legend.key.height = unit(6, "pt"),
+    # Clean facet labels
+    strip.text = element_text(size = 10, face = "bold", color = "#34495e", margin = margin(b = 8)),
+    strip.background = element_blank(),
+    # Minimal grid
     panel.grid.minor = element_blank(),
-    panel.grid.major = element_line(color = "#ECF0F1", size = 0.4)
-  )
+    panel.grid.major = element_line(color = "#f8f9fa", size = 0.3),
+    panel.grid.major.x = element_blank(),
+    # Clean background
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.caption = element_text(size = 8, color = "#95a5a6", margin = margin(t = 15), hjust = 1),
+    panel.spacing = unit(0.4, "cm"),
+    plot.margin = margin(20, 20, 15, 20)
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 2.5, alpha = 1)))
 
 print(multi_city_plot)
 
@@ -306,20 +421,20 @@ peak_comparison <- multi_city_mobility %>%
 cat("\n=== Multi-City Peak Hour Analysis ===\n")
 print(peak_comparison)
 
-# Demonstrate enhanced package capabilities
-cat("\n=== Enhanced Package Functionality Demo ===\n")
+# Demonstrate package capabilities
+cat("\n=== Package Functionality Demo ===\n")
 cat("TRADITIONAL APPROACH:\n")
 cat("# Manual zone lookup: get_zones(level='dist', zones_filter=c('28001','28002'...))\n")
 cat("# Requires external knowledge of zone codes\n\n")
 
-cat("ENHANCED APPROACH:\n") 
+cat("IMPROVED APPROACH:\n") 
 cat("# Direct city access: get_zones(level='dist', city_filter='Madrid')\n")
 cat("# Intuitive and accessible for researchers\n\n")
 
 cat("SUPPORTED FUNCTIONALITY:\n")
 cat("- City name filtering for major Spanish cities\n")
 cat("- Multi-city comparative analysis capabilities\n") 
-cat("- Enhanced accessibility for transport research\n")
+cat("- Improved accessibility for transport research\n")
 cat("- Preserved spatial integrity throughout analysis\n")
 ```
 
@@ -370,18 +485,266 @@ hourly_pattern <- madrid_mobility %>%
     .groups = "drop"
   )
 
-# Visualize hourly patterns
-ggplot(hourly_pattern, aes(x = hour, y = avg_trips, color = is_weekend)) +
-  geom_line(size = 2.5, alpha = 0.9) +
-  geom_point(size = 4, alpha = 0.9) +
-  scale_color_manual(values = c("FALSE" = "#3498DB", "TRUE" = "#E67E22"),
+# Create comprehensive time series analysis with minimal, professional design
+# 1. Daily pattern faceted time series (minimal design)
+daily_time_series <- madrid_mobility %>%
+  mutate(
+    weekday = factor(weekdays(date), 
+                    levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")),
+    day_type = ifelse(weekday %in% c("Saturday", "Sunday"), "Weekend", "Weekday")
+  ) %>%
+  group_by(weekday, hour, day_type) %>%
+  summarise(
+    avg_trips = mean(n_trips),
+    total_trips = sum(n_trips),
+    trip_variance = var(n_trips),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    trip_std = sqrt(trip_variance),
+    lower_bound = pmax(0, avg_trips - trip_std * 0.5),  # Reduced confidence interval
+    upper_bound = avg_trips + trip_std * 0.5
+  )
+
+# Create minimal faceted daily time series plot
+daily_facet_plot <- ggplot(daily_time_series, aes(x = hour, y = avg_trips)) +
+  # Subtle confidence ribbon
+  geom_ribbon(aes(ymin = lower_bound, ymax = upper_bound, fill = day_type), 
+              alpha = 0.15, color = NA) +
+  # Clean, thin trend line
+  geom_smooth(aes(color = day_type), method = "loess", span = 0.4, se = FALSE, 
+              size = 0.8, alpha = 0.9) +
+  # Minimal data points
+  geom_point(aes(color = day_type), size = 1.2, alpha = 0.7, stroke = 0) +
+  # Facet by day of week
+  facet_wrap(~weekday, ncol = 7, scales = "free_y") +
+  # Minimal color palette
+  scale_color_manual(values = c("Weekday" = "#4A90B8", "Weekend" = "#E85A4F"),
+                     name = "Day Type") +
+  scale_fill_manual(values = c("Weekday" = "#4A90B8", "Weekend" = "#E85A4F"),
+                    name = "Day Type") +
+  scale_x_continuous(breaks = c(6, 12, 18, 22), 
+                     labels = c("6AM", "12PM", "6PM", "10PM")) +
+  scale_y_continuous(labels = scales::comma_format(accuracy = 1)) +
+  labs(title = "Madrid Transport Demand by Day of Week",
+       subtitle = "Hourly patterns with trend smoothing",
+       x = NULL, 
+       y = "Average Trips",
+       caption = "mobspain package analysis") +
+  theme_minimal() +
+  theme(
+    # Clean typography
+    plot.title = element_text(size = 14, face = "bold", color = "#2c3e50", hjust = 0.5, margin = margin(b = 5)),
+    plot.subtitle = element_text(size = 11, color = "#7f8c8d", hjust = 0.5, margin = margin(b = 20)),
+    axis.title.y = element_text(size = 10, color = "#34495e", margin = margin(r = 10)),
+    axis.text = element_text(size = 8, color = "#7f8c8d"),
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    # Minimal legend
+    legend.position = "top",
+    legend.title = element_blank(),
+    legend.text = element_text(size = 9, color = "#34495e"),
+    legend.margin = margin(b = 10),
+    legend.key.width = unit(15, "pt"),
+    legend.key.height = unit(8, "pt"),
+    # Clean facet labels
+    strip.text = element_text(size = 9, face = "bold", color = "#34495e", margin = margin(b = 8)),
+    strip.background = element_blank(),
+    # Minimal grid
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(color = "#f8f9fa", size = 0.3),
+    panel.grid.major.x = element_blank(),
+    # Clean background
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.caption = element_text(size = 8, color = "#95a5a6", margin = margin(t = 15), hjust = 1),
+    panel.spacing = unit(0.3, "cm"),
+    plot.margin = margin(20, 20, 15, 20)
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 2.5, alpha = 1)),
+         fill = "none")
+
+print(daily_facet_plot)
+
+# 2. Minimal rolling time series analysis
+madrid_continuous <- madrid_mobility %>%
+  arrange(date, hour) %>%
+  mutate(
+    datetime = as.POSIXct(paste(date, paste0(hour, ":00:00")), format = "%Y-%m-%d %H:%M:%S"),
+    time_index = as.numeric(datetime - min(datetime)) / 3600
+  ) %>%
+  group_by(datetime, time_index, hour) %>%
+  summarise(
+    total_demand = sum(n_trips),
+    .groups = "drop"
+  ) %>%
+  arrange(time_index)
+
+# Calculate minimal rolling averages
+madrid_continuous <- madrid_continuous %>%
+  mutate(
+    rolling_4h = zoo::rollmean(total_demand, k = 4, fill = NA, align = "center"),
+    rolling_8h = zoo::rollmean(total_demand, k = 8, fill = NA, align = "center"),
+    rolling_12h = zoo::rollmean(total_demand, k = 12, fill = NA, align = "center")
+  )
+
+# Create minimal rolling time series plot
+rolling_plot <- ggplot(madrid_continuous, aes(x = time_index)) +
+  # Very subtle background data
+  geom_line(aes(y = total_demand), color = "#ecf0f1", alpha = 0.6, size = 0.3) +
+  # Clean rolling averages with thin lines
+  geom_line(aes(y = rolling_12h, color = "12-hour"), size = 0.9, alpha = 0.9) +
+  geom_line(aes(y = rolling_8h, color = "8-hour"), size = 0.7, alpha = 0.8) +
+  geom_line(aes(y = rolling_4h, color = "4-hour"), size = 0.5, alpha = 0.7) +
+  # Subtle day boundaries
+  geom_vline(xintercept = seq(0, max(madrid_continuous$time_index, na.rm = TRUE), by = 24), 
+             color = "#f8f9fa", size = 0.3, alpha = 0.8) +
+  # Minimal color palette
+  scale_color_manual(values = c("4-hour" = "#e74c3c", 
+                               "8-hour" = "#3498db", 
+                               "12-hour" = "#27ae60"),
+                     name = "Rolling Average") +
+  scale_x_continuous(breaks = seq(0, max(madrid_continuous$time_index, na.rm = TRUE), by = 24),
+                     labels = function(x) paste("Day", floor(x/24) + 1)) +
+  scale_y_continuous(labels = scales::comma_format(accuracy = 1)) +
+  labs(title = "Madrid Transport Demand: Rolling Trend Analysis",
+       subtitle = "Multi-scale smoothing reveals demand patterns",
+       x = "Time Period", 
+       y = "Total Hourly Demand",
+       caption = "Gray: raw data | Colors: rolling averages | mobspain analysis") +
+  theme_minimal() +
+  theme(
+    # Clean typography
+    plot.title = element_text(size = 14, face = "bold", color = "#2c3e50", margin = margin(b = 5)),
+    plot.subtitle = element_text(size = 11, color = "#7f8c8d", margin = margin(b = 20)),
+    axis.title = element_text(size = 10, color = "#34495e"),
+    axis.text = element_text(size = 9, color = "#7f8c8d"),
+    # Minimal legend
+    legend.position = "top",
+    legend.title = element_blank(),
+    legend.text = element_text(size = 9, color = "#34495e"),
+    legend.margin = margin(b = 10),
+    legend.key.width = unit(20, "pt"),
+    legend.key.height = unit(6, "pt"),
+    # Minimal grid
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_line(color = "#f8f9fa", size = 0.3),
+    panel.grid.major.x = element_blank(),
+    # Clean background
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.caption = element_text(size = 8, color = "#95a5a6", margin = margin(t = 15), hjust = 1),
+    plot.margin = margin(20, 20, 15, 20)
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 1.5, alpha = 1)))
+
+print(rolling_plot)
+
+# 3. Minimal peak period analysis
+hourly_enhanced <- hourly_pattern %>%
+  mutate(
+    period_type = case_when(
+      hour >= 7 & hour <= 9 ~ "Morning Peak",
+      hour >= 17 & hour <= 19 ~ "Evening Peak", 
+      hour >= 10 & hour <= 16 ~ "Daytime",
+      hour >= 20 & hour <= 22 ~ "Evening",
+      TRUE ~ "Off-Peak"
+    ),
+    period_type = factor(period_type, levels = c("Off-Peak", "Morning Peak", "Daytime", "Evening Peak", "Evening"))
+  )
+
+# 4. Minimal Enhanced Line Plot with Peak Periods
+demand_line_plot <- ggplot(hourly_enhanced, aes(x = hour, y = avg_trips, color = is_weekend)) +
+  # Subtle confidence ribbon
+  geom_ribbon(aes(ymin = avg_trips * 0.85, ymax = avg_trips * 1.15, fill = is_weekend), 
+              alpha = 0.12, color = NA) +
+  # Clean thin lines
+  geom_line(size = 0.9, alpha = 0.9) +
+  # Minimal points
+  geom_point(size = 1.8, alpha = 0.8, stroke = 0) +
+  # Subtle peak period highlighting
+  annotate("rect", xmin = 7, xmax = 9, ymin = -Inf, ymax = Inf, alpha = 0.05, fill = "#e74c3c") +
+  annotate("rect", xmin = 17, xmax = 19, ymin = -Inf, ymax = Inf, alpha = 0.05, fill = "#e74c3c") +
+  # Minimal peak annotations
+  annotate("text", x = 8, y = max(hourly_enhanced$avg_trips) * 0.95, 
+           label = "Morning Peak", size = 2.8, fontface = "plain", color = "#7f8c8d") +
+  annotate("text", x = 18, y = max(hourly_enhanced$avg_trips) * 0.95, 
+           label = "Evening Peak", size = 2.8, fontface = "plain", color = "#7f8c8d") +
+  # Minimal color palette
+  scale_color_manual(values = c("FALSE" = "#4A90B8", "TRUE" = "#E85A4F"),
                      labels = c("Weekday", "Weekend")) +
+  scale_fill_manual(values = c("FALSE" = "#4A90B8", "TRUE" = "#E85A4F"),
+                    labels = c("Weekday", "Weekend")) +
+  scale_x_continuous(breaks = seq(6, 22, 4), labels = function(x) paste0(x, ":00")) +
+  scale_y_continuous(labels = scales::comma_format(accuracy = 1)) +
+  labs(title = "Madrid Transport Demand by Hour",
+       subtitle = "Peak period identification with demand variability",
+       x = "Hour of Day", y = "Average Trips per Route",
+       color = "Day Type", fill = "Day Type") +
+  theme_minimal() +
+  theme(
+    # Clean typography
+    plot.title = element_text(size = 14, face = "bold", color = "#2c3e50", margin = margin(b = 5)),
+    plot.subtitle = element_text(size = 11, color = "#7f8c8d", margin = margin(b = 20)),
+    axis.title = element_text(size = 10, color = "#34495e"),
+    axis.text = element_text(size = 9, color = "#7f8c8d"),
+    # Minimal legend
+    legend.position = "top",
+    legend.title = element_blank(),
+    legend.text = element_text(size = 9, color = "#34495e"),
+    legend.margin = margin(b = 10),
+    legend.key.width = unit(15, "pt"),
+    legend.key.height = unit(8, "pt"),
+    # Minimal grid
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(color = "#f8f9fa", size = 0.3),
+    # Clean background
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.margin = margin(20, 20, 15, 20)
+  ) +
+  guides(fill = "none", 
+         color = guide_legend(override.aes = list(size = 2.5, alpha = 1)))
+
+print(demand_line_plot)
+
+# 2. Capacity vs Demand Analysis
+capacity_benchmarks <- data.frame(
+  hour = seq(6, 22, 1),
+  base_capacity = rep(c(800, 900, 1200, 1200, 1000, 900, 850, 800, 750, 
+                       800, 900, 950, 1000, 950, 900, 1100, 1300), length.out = 17),
+  peak_capacity = rep(c(1200, 1400, 1800, 1800, 1500, 1350, 1275, 1200, 1125,
+                       1200, 1350, 1425, 1500, 1425, 1350, 1650, 1950), length.out = 17)
+)
+
+# Merge with demand data
+hourly_capacity <- hourly_pattern %>%
+  filter(!is_weekend) %>%  # Focus on weekdays for capacity planning
+  left_join(capacity_benchmarks, by = "hour") %>%
+  mutate(
+    capacity_utilization = (avg_trips / base_capacity) * 100,
+    peak_utilization = (avg_trips / peak_capacity) * 100,
+    capacity_status = case_when(
+      capacity_utilization > 85 ~ "Over Capacity",
+      capacity_utilization > 70 ~ "High Utilization", 
+      capacity_utilization > 50 ~ "Moderate Utilization",
+      TRUE ~ "Under Utilized"
+    )
+  )
+
+# 3. Capacity Utilization Analysis
+capacity_plot <- ggplot(hourly_capacity, aes(x = hour)) +
+  geom_col(aes(y = base_capacity), fill = "#BDC3C7", alpha = 0.6, width = 0.8) +
+  geom_col(aes(y = avg_trips, fill = capacity_status), alpha = 0.8, width = 0.6) +
+  geom_line(aes(y = peak_capacity), color = "#E74C3C", size = 2, linetype = "dashed") +
+  scale_fill_manual(values = c("Under Utilized" = "#27AE60", "Moderate Utilization" = "#F39C12",
+                              "High Utilization" = "#E67E22", "Over Capacity" = "#E74C3C"),
+                    name = "Capacity Status") +
   scale_x_continuous(breaks = seq(6, 22, 2)) +
   scale_y_continuous(labels = scales::comma_format()) +
-  labs(title = "Madrid Hourly Transport Demand Patterns",
-       subtitle = "Peak commuting hours and weekend leisure travel patterns",
-       x = "Hour of Day", y = "Average Trips per Route",
-       color = "Period") +
+  labs(title = "Madrid Transport: Demand vs Capacity Analysis",
+       subtitle = "Current demand (colored bars) vs base capacity (gray) and peak capacity (red line)",
+       x = "Hour of Day", y = "Trips per Hour",
+       caption = "Gray bars: Base capacity | Red dashed line: Peak capacity | Colored bars: Current demand") +
   theme_minimal() +
   theme(
     legend.position = "top",
@@ -389,13 +752,13 @@ ggplot(hourly_pattern, aes(x = hour, y = avg_trips, color = is_weekend)) +
     plot.subtitle = element_text(size = 12, color = "#7F8C8D", margin = margin(b = 15)),
     axis.title = element_text(size = 11, color = "#34495E"),
     axis.text = element_text(size = 10, color = "#5D6D7E"),
-    legend.text = element_text(size = 11),
-    legend.title = element_text(size = 11, face = "bold"),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 10, face = "bold"),
     panel.grid.minor = element_blank(),
-    panel.grid.major = element_line(color = "#ECF0F1", size = 0.5),
-    plot.background = element_rect(fill = "white", color = NA),
-    panel.background = element_rect(fill = "white", color = NA)
+    plot.caption = element_text(size = 9, color = "#95A5A6", margin = margin(t = 10))
   )
+
+print(capacity_plot)
 ```
 
 ## Spatial Transport Hubs Analysis
@@ -420,7 +783,7 @@ dest_demand <- madrid_mobility %>%
   ) %>%
   arrange(desc(total_inbound))
 
-# Join with spatial data for mapping using enhanced get_zones output
+# Join with spatial data for mapping using get_zones output
 origin_spatial <- madrid_zones %>%
   left_join(origin_demand, by = c("id" = "origin")) %>%
   filter(!is.na(total_outbound))
@@ -441,8 +804,8 @@ madrid_boundary <- madrid_zones %>%
 
 # Create origin hotspot map for Madrid with complete geometries
 madrid_origin_map <- ggplot() +
-  # Add all Madrid zones as base layer for proper context
-  geom_sf(data = madrid_zones, fill = "#F8F9FA", color = "white", alpha = 0.3, size = 0.2) +
+  # Add all Madrid zones as base layer with district boundaries
+  geom_sf(data = madrid_zones, fill = "#F8F9FA", color = "#E8E9EA", alpha = 0.4, size = 0.2) +
   # Add origin hotspots on top
   geom_sf(data = origin_spatial, aes(fill = total_outbound), color = "white", alpha = 0.9, size = 0.3) +
   # Add Madrid boundary for clear definition
@@ -456,9 +819,9 @@ madrid_origin_map <- ggplot() +
                          barwidth = 1.2,
                          barheight = 8
                        )) +
-  labs(title = "Madrid Transport Origin Hotspots",
+  labs(title = "Madrid Transport Origin Hotspots with District Boundaries",
        subtitle = "Major departure points across Madrid metropolitan area",
-       caption = "Source: Enhanced mobspain analysis with city filtering") +
+       caption = "Gray lines: district boundaries | Source: mobspain analysis with city filtering") +
   theme_void() +
   theme(
     plot.title = element_text(size = 16, face = "bold", hjust = 0.5, color = "#2C3E50"),
@@ -476,8 +839,8 @@ print(madrid_origin_map)
 
 # Create destination hotspot map for Madrid with complete geometries
 madrid_dest_map <- ggplot() +
-  # Add all Madrid zones as base layer for proper context
-  geom_sf(data = madrid_zones, fill = "#F8F9FA", color = "white", alpha = 0.3, size = 0.2) +
+  # Add all Madrid zones as base layer with district boundaries
+  geom_sf(data = madrid_zones, fill = "#F8F9FA", color = "#E8E9EA", alpha = 0.4, size = 0.2) +
   # Add destination hotspots on top
   geom_sf(data = dest_spatial, aes(fill = total_inbound), color = "white", alpha = 0.9, size = 0.3) +
   # Add Madrid boundary for clear definition
@@ -491,9 +854,9 @@ madrid_dest_map <- ggplot() +
                          barwidth = 1.2,
                          barheight = 8
                        )) +
-  labs(title = "Madrid Transport Destination Hotspots",
+  labs(title = "Madrid Transport Destination Hotspots with District Boundaries",
        subtitle = "Major arrival points across Madrid metropolitan area",
-       caption = "Source: Enhanced mobspain analysis with city filtering") +
+       caption = "Gray lines: district boundaries | Source: mobspain analysis with city filtering") +
   theme_void() +
   theme(
     plot.title = element_text(size = 16, face = "bold", hjust = 0.5, color = "#2C3E50"),
@@ -628,13 +991,13 @@ capacity_plot <- ggplot(capacity_recommendations,
 print(capacity_plot)
 ```
 
-## Spatial Optimization and Network Analysis
+## Major Transport Corridors and Spatial Network Analysis
 
-```{r spatial_optimization}
-# Advanced spatial analysis using enhanced mobspain features
-cat("=== Spatial Network Optimization Analysis ===\n")
+```{r major_corridors_spatial}
+# Comprehensive transport corridors and spatial network analysis
+cat("=== Major Transport Corridors Analysis ===\n")
 
-# Identify major transport corridors for high-capacity planning
+# Identify major origin-destination corridors for high-capacity transit planning
 major_flows <- madrid_mobility %>%
   group_by(origin, dest) %>%
   summarise(
@@ -651,7 +1014,7 @@ major_flows <- madrid_mobility %>%
 cat("Top 10 Transport Corridors (Weekly Demand):\n")
 print(head(major_flows, 10))
 
-# Calculate spatial characteristics using Madrid zone coordinates
+# Get coordinates for flow mapping using Madrid zone data
 madrid_coords <- madrid_zones %>%
   mutate(
     lon = st_coordinates(st_centroid(.))[,1],
@@ -660,7 +1023,10 @@ madrid_coords <- madrid_zones %>%
   st_drop_geometry() %>%
   select(id, lon, lat)
 
-# Enhanced flow analysis with spatial metrics
+# Advanced spatial analysis using mobspain features
+cat("\n=== Spatial Network Optimization Analysis ===\n")
+
+# Flow analysis with spatial metrics
 flow_analysis <- major_flows %>%
   left_join(madrid_coords, by = c("origin" = "id")) %>%
   rename(origin_lon = lon, origin_lat = lat) %>%
@@ -730,10 +1096,10 @@ cat("\nNetwork Connectivity Analysis:\n")
 cat("Top 5 zones by network connectivity:\n")
 print(head(network_stats, 5))
 
-# Hub identification using enhanced scoring
+# Hub identification using scoring
 hub_analysis <- network_stats %>%
   mutate(
-    # Enhanced hub scoring considering connectivity and demand
+    # Hub scoring considering connectivity and demand
     connectivity_score = destinations_served / max(destinations_served, na.rm = TRUE),
     demand_score = total_outbound / max(total_outbound, na.rm = TRUE),
     hub_score = (connectivity_score + demand_score) / 2,
@@ -816,38 +1182,10 @@ priority_map <- ggplot(priority_zones) +
 print(priority_map)
 ```
 
-## Major Transport Corridors Analysis
-
 ```{r major_corridors}
-# Identify major origin-destination corridors for high-capacity transit planning
-cat("=== Major Transport Corridors Analysis ===\n")
+# Continue with corridor mapping and analysis
 
-major_flows <- madrid_mobility %>%
-  group_by(origin, dest) %>%
-  summarise(
-    avg_daily_trips = mean(n_trips),
-    total_weekly_trips = sum(n_trips),
-    peak_demand = mean(n_trips[is_peak]),
-    weekend_demand = mean(n_trips[is_weekend]),
-    weekday_demand = mean(n_trips[!is_weekend]),
-    .groups = "drop"
-  ) %>%
-  arrange(desc(total_weekly_trips)) %>%
-  head(20)  # Top 20 flows for detailed analysis
-
-cat("Top 10 Transport Corridors (Weekly Demand):\n")
-print(head(major_flows, 10))
-
-# Get coordinates for flow mapping using Madrid zone data
-madrid_coords <- madrid_zones %>%
-  mutate(
-    lon = st_coordinates(st_centroid(.))[,1],
-    lat = st_coordinates(st_centroid(.))[,2]
-  ) %>%
-  st_drop_geometry() %>%
-  select(id, lon, lat)
-
-# Enhanced flow analysis with spatial metrics
+# Flow analysis with spatial metrics
 flow_coords <- major_flows %>%
   left_join(madrid_coords, by = c("origin" = "id")) %>%
   rename(origin_lon = lon, origin_lat = lat) %>%
@@ -865,39 +1203,39 @@ flow_coords <- major_flows %>%
     flow_category = factor(flow_category, levels = c("Low", "Medium", "High", "Very High"))
   )
 
-# Create enhanced flow map for major corridors within Madrid
+# Create flow map for major corridors within Madrid
 if(nrow(flow_coords) > 0) {
   flow_map <- ggplot() +
-    # Madrid zones as base layer
-    geom_sf(data = madrid_zones, fill = "#F8F9FA", color = "white", alpha = 0.4, size = 0.1) +
+    # Madrid zones as base layer with district boundaries
+    geom_sf(data = madrid_zones, fill = "#F8F9FA", color = "#E8E9EA", alpha = 0.5, size = 0.2) +
     # Madrid boundary for context
-    geom_sf(data = madrid_boundary, fill = NA, color = "#2C3E50", size = 0.8) +
-    # Major transport flows as curved paths
+    geom_sf(data = madrid_boundary, fill = NA, color = "#2C3E50", size = 1) +
+    # Major transport flows as curved paths with reduced weights
     geom_curve(data = flow_coords,
                aes(x = origin_lon, y = origin_lat, 
                    xend = dest_lon, yend = dest_lat,
                    color = flow_category, size = flow_category),
-               alpha = 0.8, curvature = 0.15, ncp = 5) +
+               alpha = 0.7, curvature = 0.1, ncp = 5) +
     # Origin points highlighted
     geom_point(data = flow_coords,
                aes(x = origin_lon, y = origin_lat),
-               color = "#E74C3C", alpha = 0.9, size = 3.5, shape = 21, 
-               fill = "#FFFFFF", stroke = 1.2) +
+               color = "#E74C3C", alpha = 0.9, size = 3, shape = 21, 
+               fill = "#FFFFFF", stroke = 1) +
     # Destination points highlighted  
     geom_point(data = flow_coords,
                aes(x = dest_lon, y = dest_lat),
-               color = "#3498DB", alpha = 0.9, size = 3.5, shape = 24, 
-               fill = "#FFFFFF", stroke = 1.2) +
+               color = "#3498DB", alpha = 0.9, size = 3, shape = 24, 
+               fill = "#FFFFFF", stroke = 1) +
     scale_color_manual(name = "Flow\nIntensity", 
                        values = c("Low" = "#BDC3C7", "Medium" = "#F39C12", 
                                 "High" = "#E67E22", "Very High" = "#E74C3C"),
-                       guide = guide_legend(override.aes = list(size = 3))) +
+                       guide = guide_legend(override.aes = list(size = 2.5))) +
     scale_size_manual(name = "Flow\nIntensity",
-                      values = c("Low" = 1, "Medium" = 1.8, "High" = 2.5, "Very High" = 3.2),
+                      values = c("Low" = 0.8, "Medium" = 1.2, "High" = 1.6, "Very High" = 2),
                       guide = "none") +
-    labs(title = "Madrid Major Transport Corridors",
-         subtitle = "High-capacity route planning with passenger flow intensity",
-         caption = "Curved lines: flow paths | Circles: origins | Triangles: destinations") +
+    labs(title = "Madrid Major Transport Corridors with District Boundaries",
+         subtitle = "High-capacity route planning with administrative context",
+         caption = "Gray lines: district boundaries | Curved lines: flow paths | Circles: origins | Triangles: destinations") +
     theme_void() +
     theme(
       plot.title = element_text(size = 16, face = "bold", hjust = 0.5, color = "#2C3E50"),
@@ -926,7 +1264,7 @@ corridor_comparison <- major_flows %>%
   select(flow_id, weekday_demand, weekend_demand, weekend_ratio) %>%
   arrange(desc(weekday_demand))
 
-# Enhanced weekday vs weekend corridor comparison
+# Weekday vs weekend corridor comparison
 corridor_plot <- ggplot(corridor_comparison, aes(x = reorder(flow_id, weekday_demand))) +
   geom_col(aes(y = weekday_demand), fill = "#3498DB", alpha = 0.9, width = 0.6) +
   geom_col(aes(y = weekend_demand), fill = "#E67E22", alpha = 0.9, width = 0.6) +
@@ -979,7 +1317,7 @@ capacity_analysis <- madrid_mobility %>%
 cat("Top 10 zones requiring highest capacity:\n")
 print(head(capacity_analysis, 10))
 
-# Enhanced capacity requirements visualization
+# Capacity requirements visualization
 capacity_scatter <- ggplot(capacity_analysis, aes(x = avg_hourly_demand, y = peak_hour_demand)) +
   geom_point(aes(size = recommended_capacity, color = weekend_adjustment), alpha = 0.8, stroke = 0.8) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "#E74C3C", size = 1.2) +
@@ -1021,7 +1359,7 @@ fleet_schedule <- madrid_mobility %>%
     period_type = ifelse(is_weekend, "Weekend", "Weekday")
   )
 
-# Enhanced fleet allocation visualization
+# Fleet allocation visualization
 fleet_plot <- ggplot(fleet_schedule, aes(x = hour, y = recommended_vehicles, fill = period_type)) +
   geom_col(position = "dodge", alpha = 0.8, width = 0.9) +
   scale_fill_manual(values = c("Weekday" = "#2E4A6B", "Weekend" = "#E67E22"),
@@ -1066,7 +1404,7 @@ cat("\n=== Service Frequency Recommendations ===\n")
 service_summary <- table(frequency_analysis$service_level)
 print(service_summary)
 
-# Enhanced service frequency distribution visualization
+# Service frequency distribution visualization
 frequency_plot <- ggplot(frequency_analysis, aes(x = reorder(paste0(substr(origin,1,5), "→", substr(dest,1,5)), 
                                           optimal_frequency), 
                               y = optimal_frequency, fill = service_level)) +
@@ -1094,93 +1432,11 @@ frequency_plot <- ggplot(frequency_analysis, aes(x = reorder(paste0(substr(origi
 print(frequency_plot)
 ```
 
-## Zone Size Distribution Analysis
-
-```{r zone_distribution}
-# Create zone size categories
-madrid_categorized <- madrid_zones %>%
-  mutate(
-    area_km2 = as.numeric(st_area(.)) / 1000000,
-    size_category = cut(area_km2, 
-                       breaks = quantile(area_km2, c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE),
-                       labels = c("Small", "Medium", "Large", "Very Large"),
-                       include.lowest = TRUE)
-  )
-
-# Distribution analysis
-size_distribution <- madrid_categorized %>%
-  st_drop_geometry() %>%
-  group_by(size_category) %>%
-  summarise(
-    count = n(),
-    total_area = round(sum(area_km2, na.rm = TRUE), 1),
-    avg_area = round(mean(area_km2, na.rm = TRUE), 3),
-    .groups = "drop"
-  ) %>%
-  mutate(
-    percentage = round(count / sum(count) * 100, 1),
-    area_percentage = round(total_area / sum(total_area) * 100, 1)
-  )
-
-print(size_distribution)
-```
-
-## Spatial Distribution Visualization
-
-```{r spatial_visualization}
-# Create spatial map
-madrid_map <- ggplot(madrid_categorized) +
-  geom_sf(aes(fill = size_category), color = "white", size = 0.1) +
-  scale_fill_viridis_d(name = "Zone Size\nCategory", option = "plasma") +
-  theme_void() +
-  theme(
-    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(size = 11, hjust = 0.5),
-    legend.position = "right",
-    legend.text = element_text(size = 9),
-    legend.title = element_text(size = 10, face = "bold")
-  ) +
-  labs(
-    title = "Madrid Administrative Zones by Size Category",
-    subtitle = paste("Total zones:", nrow(madrid_zones), "| District level analysis"),
-    caption = "Data: mobspain package | Enhanced city filtering capability"
-  )
-
-print(madrid_map)
-```
-
-## Size Category Distribution
-
-```{r distribution_plot}
-# Zone count distribution
-distribution_plot <- ggplot(size_distribution, aes(x = size_category, y = count)) +
-  geom_col(fill = "#2E8B57", alpha = 0.8, width = 0.7) +
-  geom_text(aes(label = paste0(count, "\n(", percentage, "%)")), 
-            vjust = -0.5, size = 3.5, fontface = "bold") +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 12, face = "bold"),
-    axis.title = element_text(size = 10, face = "bold"),
-    axis.text = element_text(size = 9),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank()
-  ) +
-  labs(
-    title = "Distribution of Madrid Zones by Size Category",
-    x = "Zone Size Category",
-    y = "Number of Zones",
-    caption = "Quartile-based size categorization"
-  ) +
-  ylim(0, max(size_distribution$count) * 1.2)
-
-print(distribution_plot)
-```
-
 ## Comparative Analysis: Usage Improvement
 
 ```{r usage_comparison}
-# Demonstrate enhanced functionality
-cat("=== ENHANCED MOBSPAIN CAPABILITIES ===\n\n")
+# Demonstrate functionality
+cat("=== MOBSPAIN CAPABILITIES ===\n\n")
 
 cat("TRADITIONAL APPROACH (Before Enhancement):\n")
 cat("# Manual zone code lookup required\n")
@@ -1188,7 +1444,7 @@ cat("# zones <- get_zones(level = 'dist', zones_filter = c('28001', '28002', ...
 cat("# Requires external knowledge of zone codes\n")
 cat("# Error-prone and time-consuming\n\n")
 
-cat("ENHANCED APPROACH (Current Implementation):\n")
+cat("IMPROVED APPROACH (Current Implementation):\n")
 cat("# Direct city name usage\n")
 cat("madrid_zones <- get_zones(level = 'dist', city_filter = 'Madrid')\n")
 cat("# Intuitive and accessible\n")
@@ -1255,7 +1511,7 @@ total_zones_analyzed <- sum(city_comparison$total_zones)
 cat("\n4. MULTI-CITY ANALYSIS CAPABILITIES:\n")
 cat("   - Spanish cities analyzed:", cities_analyzed, "\n")
 cat("   - Total administrative zones processed:", total_zones_analyzed, "\n")
-cat("   - Enhanced package accessibility through city name filtering\n")
+cat("   - Improved package accessibility through city name filtering\n")
 
 # Major corridors analysis insights
 top_corridor_demand <- max(major_flows$total_weekly_trips, na.rm = TRUE)
