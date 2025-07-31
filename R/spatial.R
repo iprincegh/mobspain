@@ -283,7 +283,7 @@ calculate_containment <- function(mobility_data, spatial_zones = NULL, create_ma
   
   message("Step 2: Calculated containment for ", nrow(containment), " zones")
   
-  # Create result object
+  # Create result object with S3 class
   result <- list(
     containment = containment,
     summary = list(
@@ -293,6 +293,8 @@ calculate_containment <- function(mobility_data, spatial_zones = NULL, create_ma
       min_containment = min(containment$containment_index, na.rm = TRUE)
     )
   )
+  
+  class(result) <- "mobspain_containment"
   
   # Create spatial map if requested
   if(create_map && !is.null(spatial_zones)) {
@@ -365,7 +367,7 @@ detect_anomalies <- function(mobility_data, threshold = 2.5,
   message("Step 2: Found ", anomaly_count, " anomalous zones (", 
           round(anomaly_count/nrow(zone_trips)*100, 1), "% of zones)")
   
-  # Create result object
+  # Create result object with S3 class
   result <- list(
     anomalies = zone_trips,
     summary = list(
@@ -375,6 +377,8 @@ detect_anomalies <- function(mobility_data, threshold = 2.5,
       threshold_used = threshold
     )
   )
+  
+  class(result) <- "mobspain_anomalies"
   
   # Create spatial map if requested
   if(create_map && !is.null(spatial_zones)) {
@@ -826,4 +830,103 @@ calculate_spatial_lag <- function(zones, variable, method = "contiguity", k = 5,
   message("Calculated spatial lag for ", nrow(zones), " zones")
   
   return(spatial_lag)
+}
+
+#' Print method for mobspain_containment objects
+#' @param x mobspain_containment object
+#' @param ... Additional arguments (ignored)
+#' @export
+print.mobspain_containment <- function(x, ...) {
+  cat("Mobility Containment Analysis\n")
+  cat("=============================\n\n")
+  
+  cat("Total zones analyzed:", nrow(x$containment), "\n")
+  cat("Average containment:", round(x$summary$avg_containment, 3), "\n")
+  cat("Median containment:", round(x$summary$median_containment, 3), "\n")
+  cat("Range:", round(x$summary$min_containment, 3), "to", round(x$summary$max_containment, 3), "\n\n")
+  
+  cat("Top 5 zones by containment:\n")
+  top_zones <- head(x$containment[order(-x$containment$containment_index), ], 5)
+  print(top_zones[, c("id", "containment_index")])
+  
+  if(!is.null(x$map)) {
+    cat("\nSpatial map available in $map component\n")
+  }
+  
+  invisible(x)
+}
+
+#' Summary method for mobspain_containment objects
+#' @param object mobspain_containment object
+#' @param ... Additional arguments (ignored)
+#' @export
+summary.mobspain_containment <- function(object, ...) {
+  cat("Mobility Containment Summary\n")
+  cat("============================\n\n")
+  
+  summary_stats <- object$summary
+  cat("Statistical Summary:\n")
+  cat("  Mean:", round(summary_stats$avg_containment, 4), "\n")
+  cat("  Median:", round(summary_stats$median_containment, 4), "\n")
+  cat("  Min:", round(summary_stats$min_containment, 4), "\n")
+  cat("  Max:", round(summary_stats$max_containment, 4), "\n\n")
+  
+  # Distribution
+  containment_values <- object$containment$containment_index
+  cat("Distribution:\n")
+  cat("  < 0.1 (low):", sum(containment_values < 0.1, na.rm = TRUE), "zones\n")
+  cat("  0.1-0.3 (medium):", sum(containment_values >= 0.1 & containment_values < 0.3, na.rm = TRUE), "zones\n")
+  cat("  >= 0.3 (high):", sum(containment_values >= 0.3, na.rm = TRUE), "zones\n")
+  
+  invisible(object)
+}
+
+#' Print method for mobspain_anomalies objects
+#' @param x mobspain_anomalies object
+#' @param ... Additional arguments (ignored)
+#' @export
+print.mobspain_anomalies <- function(x, ...) {
+  cat("Mobility Anomaly Detection\n")
+  cat("==========================\n\n")
+  
+  cat("Total zones analyzed:", x$summary$total_zones, "\n")
+  cat("Anomalies detected:", x$summary$anomaly_count, "(", x$summary$anomaly_percentage, "%)\n")
+  cat("Threshold used:", x$summary$threshold_used, "standard deviations\n\n")
+  
+  if(x$summary$anomaly_count > 0) {
+    cat("Anomalous zones (top 5 by z-score):\n")
+    anomalous <- x$anomalies[x$anomalies$is_anomaly == TRUE, ]
+    top_anomalies <- head(anomalous[order(-anomalous$z_score), ], 5)
+    print(top_anomalies[, c("id", "total_trips", "z_score")])
+  }
+  
+  if(!is.null(x$map)) {
+    cat("\nSpatial map available in $map component\n")
+  }
+  
+  invisible(x)
+}
+
+#' Summary method for mobspain_anomalies objects
+#' @param object mobspain_anomalies object
+#' @param ... Additional arguments (ignored)
+#' @export
+summary.mobspain_anomalies <- function(object, ...) {
+  cat("Mobility Anomaly Detection Summary\n")
+  cat("==================================\n\n")
+  
+  cat("Detection Parameters:\n")
+  cat("  Threshold:", object$summary$threshold_used, "standard deviations\n")
+  cat("  Total zones:", object$summary$total_zones, "\n")
+  cat("  Anomalies found:", object$summary$anomaly_count, "\n")
+  cat("  Anomaly rate:", object$summary$anomaly_percentage, "%\n\n")
+  
+  # Trip distribution
+  trips <- object$anomalies$total_trips
+  cat("Trip Distribution:\n")
+  cat("  Mean trips per zone:", round(mean(trips, na.rm = TRUE), 0), "\n")
+  cat("  Median trips per zone:", round(median(trips, na.rm = TRUE), 0), "\n")
+  cat("  Standard deviation:", round(sd(trips, na.rm = TRUE), 0), "\n")
+  
+  invisible(object)
 }

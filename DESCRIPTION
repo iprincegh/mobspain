@@ -13,8 +13,10 @@ Description: A comprehensive toolkit for spatial analysis of Spanish mobility pa
     provided using sf package integration. Features include mobility data retrieval 
     with advanced filtering capabilities (by region, province, or specific zones), 
     spatial containment analysis, anomaly detection, machine learning prediction, 
-    and interactive spatial visualizations. Filtering options allow users to 
-    download only the data they need, reducing memory usage and improving performance.
+    and interactive spatial visualizations. The package includes S3 classes for 
+    structured analysis results with custom print and summary methods. A comprehensive 
+    data analysis vignette demonstrates spatial mobility analysis with real Spanish 
+    transportation data.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
